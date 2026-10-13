@@ -1,0 +1,7 @@
+category_id,category_name,subcategory_name
+1,Access & Permissions,Password & SSO Authentication
+2,Software,Application Installation & Licensing
+3,Hardware,"Laptops, Peripherals & Monitors"
+4,Network & Connectivity,"VPN, Wi-Fi & DNS"
+5,Email & Collaboration,"Outlook, Slack & Teams Sync"
+6,Cloud & Infrastructure,"VM Provisioning, DB Access & Storage"

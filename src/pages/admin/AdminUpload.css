@@ -1,0 +1,520 @@
+/* Scoped VibeUI Design System (Design ID: a4c30bc8-6bc8-405c-9900-42c38c4e6b4b) */
+/* AetherFlow Data Intelligence Platform LP (03:25) Palette & Component Architecture */
+
+.af-admin-scope {
+  --af-color-primary-text: #2c3e50;
+  --af-color-secondary-text: #7f8c8d;
+  --af-color-white: #ffffff;
+  --af-color-light-grey: #f8fafc;
+  --af-color-bg-canvas: #f1f5f9;
+  --af-color-border-light: #dde2e6;
+  --af-color-accent-blue: #3498db;
+  --af-color-accent-blue-dark: #2980b9;
+  --af-color-accent-purple: #8e44ad;
+  --af-color-accent-purple-light: #9b59b6;
+  --af-color-banner-bg: #8e44ad;
+  --af-color-ai-card-bg: #f9f0ff;
+  --af-color-ai-card-border: #e8d0fb;
+  --af-color-ai-sparkle-icon: #f1c40f;
+  --af-color-success: #27ae60;
+  --af-color-success-bg: #eafaf1;
+  --af-color-danger: #e74c3c;
+  --af-color-warning: #f39c12;
+  --af-color-warning-bg: #fef9e7;
+
+  --af-font-family-base: "Segoe UI", -apple-system, BlinkMacSystemFont, Tahoma, Geneva, Verdana, sans-serif;
+  --af-font-size-base: 15px;
+  --af-line-height-base: 1.6;
+
+  --af-font-size-h1: 2.4rem;
+  --af-font-size-h2: 1.85rem;
+  --af-font-size-h3: 1.4rem;
+  --af-font-size-h4: 1.15rem;
+  --af-font-size-small: 0.85rem;
+  --af-font-size-micro: 0.75rem;
+
+  --af-spacing-xxs: 4px;
+  --af-spacing-xs: 8px;
+  --af-spacing-sm: 12px;
+  --af-spacing-md: 16px;
+  --af-spacing-lg: 24px;
+  --af-spacing-xl: 32px;
+  --af-spacing-xxl: 48px;
+
+  --af-border-radius-sm: 4px;
+  --af-border-radius-md: 8px;
+  --af-border-radius-lg: 12px;
+
+  --af-transition-fast: 0.2s ease-in-out;
+  --af-transition-medium: 0.3s ease-in-out;
+
+  font-family: var(--af-font-family-base);
+  color: var(--af-color-primary-text);
+  line-height: var(--af-line-height-base);
+  width: 100%;
+}
+
+/* Announcement Banner */
+.af-admin-scope .af-announcement-banner {
+  background-color: var(--af-color-banner-bg);
+  color: var(--af-color-white);
+  padding: 10px 18px;
+  border-radius: var(--af-border-radius-md);
+  margin-bottom: var(--af-spacing-lg);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  box-shadow: 0 4px 12px rgba(142, 68, 173, 0.2);
+}
+
+.af-admin-scope .af-announcement-content {
+  display: flex;
+  align-items: center;
+  gap: var(--af-spacing-sm);
+  font-size: 14px;
+}
+
+.af-admin-scope .af-announcement-badge {
+  background: rgba(255, 255, 255, 0.2);
+  padding: 2px 8px;
+  border-radius: var(--af-border-radius-sm);
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+}
+
+.af-admin-scope .af-announcement-right {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  opacity: 0.95;
+  transition: opacity var(--af-transition-fast);
+}
+
+.af-admin-scope .af-announcement-right:hover {
+  opacity: 1;
+  text-decoration: underline;
+}
+
+/* Page Header Structure */
+.af-admin-scope .af-page-header {
+  margin-bottom: var(--af-spacing-xl);
+  border-bottom: 1px solid var(--af-color-border-light);
+  padding-bottom: var(--af-spacing-lg);
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-end;
+  flex-wrap: wrap;
+  gap: var(--af-spacing-md);
+}
+
+.af-admin-scope .af-breadcrumbs {
+  font-size: 12px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--af-color-secondary-text);
+  margin-bottom: var(--af-spacing-xs);
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.af-admin-scope .af-breadcrumbs span.active {
+  color: var(--af-color-accent-blue);
+}
+
+.af-admin-scope .af-heading {
+  font-size: var(--af-font-size-h1);
+  font-weight: 700;
+  letter-spacing: -0.025em;
+  color: var(--af-color-primary-text);
+  line-height: 1.15;
+  margin: 0;
+  position: relative;
+  display: inline-block;
+}
+
+.af-admin-scope .af-heading::after {
+  content: '';
+  display: block;
+  position: absolute;
+  left: 0;
+  bottom: -6px;
+  width: 48px;
+  height: 3px;
+  background-color: var(--af-color-accent-blue);
+  border-radius: 2px;
+}
+
+.af-admin-scope .af-subtext {
+  font-size: var(--af-font-size-base);
+  color: var(--af-color-secondary-text);
+  margin-top: 12px;
+  max-width: 720px;
+}
+
+/* Actions Header */
+.af-admin-scope .af-header-actions {
+  display: flex;
+  align-items: center;
+  gap: var(--af-spacing-sm);
+}
+
+/* Buttons */
+.af-admin-scope .af-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 10px 20px;
+  border-radius: var(--af-border-radius-sm);
+  font-weight: 700;
+  font-size: 14px;
+  line-height: 1;
+  cursor: pointer;
+  border: 1px solid transparent;
+  transition: background-color var(--af-transition-fast), color var(--af-transition-fast), transform var(--af-transition-fast), box-shadow var(--af-transition-fast);
+  text-decoration: none;
+}
+
+.af-admin-scope .af-button-primary {
+  background-color: var(--af-color-accent-blue);
+  color: var(--af-color-white);
+  box-shadow: 0 4px 10px rgba(52, 152, 219, 0.25);
+}
+
+.af-admin-scope .af-button-primary:hover {
+  background-color: var(--af-color-accent-blue-dark);
+  box-shadow: 0 6px 14px rgba(52, 152, 219, 0.35);
+  transform: translateY(-1px);
+}
+
+.af-admin-scope .af-button-secondary {
+  background-color: var(--af-color-white);
+  color: var(--af-color-primary-text);
+  border: 1px solid var(--af-color-border-light);
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.04);
+}
+
+.af-admin-scope .af-button-secondary:hover {
+  background-color: var(--af-color-light-grey);
+  border-color: #cbd5e1;
+}
+
+.af-admin-scope .af-button-purple {
+  background-color: var(--af-color-accent-purple);
+  color: var(--af-color-white);
+  box-shadow: 0 4px 10px rgba(142, 68, 173, 0.25);
+}
+
+.af-admin-scope .af-button-purple:hover {
+  background-color: var(--af-color-accent-purple-light);
+  transform: translateY(-1px);
+}
+
+/* Cards & Layout */
+.af-admin-scope .af-grid-container {
+  display: grid;
+  grid-template-columns: 12fr;
+  gap: var(--af-spacing-lg);
+}
+
+@media (min-width: 1024px) {
+  .af-admin-scope .af-grid-split {
+    grid-template-columns: 7fr 5fr;
+  }
+}
+
+.af-admin-scope .af-card {
+  background-color: var(--af-color-white);
+  border: 1px solid var(--af-color-border-light);
+  border-radius: var(--af-border-radius-lg);
+  padding: var(--af-spacing-lg);
+  box-shadow: 0 10px 25px rgba(0, 0, 0, 0.05);
+  transition: transform var(--af-transition-medium), box-shadow var(--af-transition-medium);
+}
+
+.af-admin-scope .af-card:hover {
+  box-shadow: 0 14px 28px rgba(0, 0, 0, 0.08);
+}
+
+.af-admin-scope .af-card-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding-bottom: var(--af-spacing-md);
+  margin-bottom: var(--af-spacing-md);
+  border-bottom: 1px solid var(--af-color-border-light);
+}
+
+.af-admin-scope .af-card-title {
+  font-size: var(--af-font-size-h4);
+  font-weight: 700;
+  color: var(--af-color-primary-text);
+  margin: 0;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.af-admin-scope .af-card-badge {
+  font-size: 11px;
+  font-weight: 700;
+  padding: 3px 8px;
+  border-radius: var(--af-border-radius-sm);
+  background-color: #ebf5fb;
+  color: var(--af-color-accent-blue);
+  border: 1px solid #d4e6f1;
+}
+
+/* AI Special Highlight Card */
+.af-admin-scope .af-ai-card {
+  background-color: var(--af-color-ai-card-bg);
+  border: 1px solid var(--af-color-ai-card-border);
+  border-radius: var(--af-border-radius-lg);
+  padding: var(--af-spacing-md);
+  margin-bottom: var(--af-spacing-lg);
+  display: flex;
+  align-items: flex-start;
+  gap: var(--af-spacing-md);
+}
+
+.af-admin-scope .af-ai-icon-circle {
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  background-color: var(--af-color-accent-purple);
+  color: #fff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  box-shadow: 0 4px 8px rgba(142, 68, 173, 0.3);
+}
+
+.af-admin-scope .af-ai-title {
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--af-color-accent-purple);
+  margin-bottom: 2px;
+}
+
+.af-admin-scope .af-ai-desc {
+  font-size: 12px;
+  color: #555;
+  line-height: 1.5;
+}
+
+/* Dropzone */
+.af-admin-scope .af-dropzone {
+  border: 2px dashed #b3d4fc;
+  background-color: #fcfdfe;
+  border-radius: var(--af-border-radius-lg);
+  padding: var(--af-spacing-xxl) var(--af-spacing-xl);
+  text-align: center;
+  cursor: pointer;
+  transition: all var(--af-transition-fast);
+  position: relative;
+}
+
+.af-admin-scope .af-dropzone:hover,
+.af-admin-scope .af-dropzone.active {
+  border-color: var(--af-color-accent-blue);
+  background-color: #f0f7fe;
+  transform: translateY(-2px);
+}
+
+.af-admin-scope .af-dropzone-icon {
+  width: 56px;
+  height: 56px;
+  border-radius: 50%;
+  background-color: #ebf5fb;
+  color: var(--af-color-accent-blue);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin: 0 auto var(--af-spacing-md);
+  transition: all var(--af-transition-fast);
+}
+
+.af-admin-scope .af-dropzone:hover .af-dropzone-icon {
+  background-color: var(--af-color-accent-blue);
+  color: #fff;
+  transform: scale(1.05);
+}
+
+.af-admin-scope .af-dropzone-title {
+  font-size: 16px;
+  font-weight: 700;
+  color: var(--af-color-primary-text);
+  margin-bottom: 4px;
+}
+
+.af-admin-scope .af-dropzone-subtitle {
+  font-size: 13px;
+  color: var(--af-color-secondary-text);
+  margin-bottom: var(--af-spacing-md);
+}
+
+.af-admin-scope .af-dropzone-meta {
+  display: inline-flex;
+  align-items: center;
+  gap: 12px;
+  font-size: 11px;
+  font-weight: 600;
+  color: #94a3b8;
+  padding: 4px 12px;
+  background: rgba(0, 0, 0, 0.03);
+  border-radius: 20px;
+}
+
+/* Schema Requirements List */
+.af-admin-scope .af-schema-list {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.af-admin-scope .af-schema-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 10px 14px;
+  border-radius: var(--af-border-radius-sm);
+  background-color: var(--af-color-light-grey);
+  border: 1px solid var(--af-color-border-light);
+  font-size: 13px;
+}
+
+.af-admin-scope .af-schema-name {
+  font-family: Consolas, Monaco, "Courier New", monospace;
+  font-weight: 700;
+  color: var(--af-color-accent-blue);
+}
+
+.af-admin-scope .af-schema-type {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--af-color-secondary-text);
+  background: #e2e8f0;
+  padding: 2px 6px;
+  border-radius: 3px;
+}
+
+/* Process Steps (from VibeUI a4c30bc8) */
+.af-admin-scope .af-process-steps {
+  display: flex;
+  flex-direction: column;
+  gap: var(--af-spacing-md);
+  margin-top: var(--af-spacing-md);
+}
+
+.af-admin-scope .af-process-step {
+  position: relative;
+  padding-left: 42px;
+}
+
+.af-admin-scope .af-step-number {
+  position: absolute;
+  left: 0;
+  top: 0;
+  font-size: 20px;
+  font-weight: 700;
+  color: var(--af-color-accent-blue);
+  line-height: 1;
+}
+
+.af-admin-scope .af-step-title {
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--af-color-primary-text);
+  margin-bottom: 2px;
+}
+
+.af-admin-scope .af-step-desc {
+  font-size: 12px;
+  color: var(--af-color-secondary-text);
+  line-height: 1.4;
+}
+
+/* Table Style */
+.af-admin-scope .af-table-wrapper {
+  overflow-x: auto;
+  border: 1px solid var(--af-color-border-light);
+  border-radius: var(--af-border-radius-md);
+}
+
+.af-admin-scope .af-table {
+  width: 100%;
+  border-collapse: collapse;
+  text-align: left;
+  font-size: 13px;
+}
+
+.af-admin-scope .af-table thead th {
+  background-color: var(--af-color-light-grey);
+  border-bottom: 1px solid var(--af-color-border-light);
+  padding: 12px 14px;
+  color: var(--af-color-secondary-text);
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.af-admin-scope .af-table tbody tr {
+  border-bottom: 1px solid var(--af-color-border-light);
+  transition: background-color var(--af-transition-fast);
+}
+
+.af-admin-scope .af-table tbody tr:last-child {
+  border-bottom: none;
+}
+
+.af-admin-scope .af-table tbody tr:hover {
+  background-color: #fbfdff;
+}
+
+.af-admin-scope .af-table td {
+  padding: 12px 14px;
+  color: var(--af-color-primary-text);
+}
+
+.af-admin-scope .af-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 3px 8px;
+  border-radius: 4px;
+  font-size: 11px;
+  font-weight: 700;
+}
+
+.af-admin-scope .af-chip-success {
+  background-color: var(--af-color-success-bg);
+  color: var(--af-color-success);
+  border: 1px solid #c8e6c9;
+}
+
+.af-admin-scope .af-chip-warning {
+  background-color: var(--af-color-warning-bg);
+  color: var(--af-color-warning);
+  border: 1px solid #f9e79f;
+}
+
+/* Staging File Pill */
+.af-admin-scope .af-staged-file {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px 16px;
+  background-color: #f0f7fe;
+  border: 1px solid #b3d4fc;
+  border-radius: var(--af-border-radius-md);
+  margin-top: var(--af-spacing-md);
+}

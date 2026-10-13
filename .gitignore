@@ -1,0 +1,38 @@
+# Logs
+logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+lerna-debug.log*
+
+# Dependencies and build output
+node_modules/
+dist/
+dist-ssr/
+*.local
+
+# Environment variables & secret files
+.env
+.env.*
+!.env.example
+
+# Backup archives, binary documents, and loose captures
+*.zip
+*.docx
+shot_chrome.png
+
+# Editor and IDE directories
+.vscode/*
+!.vscode/extensions.json
+.idea/
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.sw?
+
+# Operating System metadata
+.DS_Store
+Thumbs.db
