@@ -1,5 +1,5 @@
 import React from 'react';
-import { dataService } from '../../services/dataService';
+import { dataService, useDataService } from '../../services/dataService';
 import { PageHeader } from '../../components/common/PageHeader';
 import { KpiCard } from '../../components/common/KpiCard';
 import { ChartCard } from '../../components/common/ChartCard';
@@ -23,6 +23,7 @@ import {
 } from 'recharts';
 
 export const WorkloadPage: React.FC = () => {
+  useDataService();
   const teamBreakdown = dataService.getTeamBreakdown();
   const agents = dataService.getAgents();
 

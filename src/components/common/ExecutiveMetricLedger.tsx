@@ -10,21 +10,25 @@ export const ExecutiveMetricLedger: React.FC<ExecutiveMetricLedgerProps> = ({ me
     {
       label: 'TOTAL VOLUME',
       value: metrics.totalTickets.toLocaleString(),
-      detail: '8,000 governed records',
+      detail: metrics.totalTickets === 8000 ? '8,000 governed records' : `${metrics.totalTickets.toLocaleString()} filtered records`,
       status: 'neutral',
       group: 'Volume'
     },
     {
       label: 'OPEN BACKLOG',
       value: metrics.openTickets.toLocaleString(),
-      detail: '17.4% pending resolution',
+      detail: metrics.openBreakdown
+        ? `${metrics.openBreakdown.open} Open · ${metrics.openBreakdown.inProgress} In Prog · ${metrics.openBreakdown.pending} Pend`
+        : `${metrics.totalTickets > 0 ? Math.round((metrics.openTickets / metrics.totalTickets) * 1000) / 10 : 0}% pending resolution`,
       status: 'warning',
       group: 'Volume'
     },
     {
       label: 'RESOLVED OUTCOMES',
       value: metrics.resolvedTickets.toLocaleString(),
-      detail: '82.7% resolved denominator',
+      detail: metrics.resolvedBreakdown
+        ? `${metrics.resolvedBreakdown.resolved} Resolved · ${metrics.resolvedBreakdown.closed} Closed`
+        : `${metrics.totalTickets > 0 ? Math.round((metrics.resolvedTickets / metrics.totalTickets) * 1000) / 10 : 0}% resolved denominator`,
       status: 'healthy',
       group: 'Volume'
     },
@@ -38,8 +42,8 @@ export const ExecutiveMetricLedger: React.FC<ExecutiveMetricLedgerProps> = ({ me
     {
       label: 'SLA COMPLIANCE',
       value: `${metrics.slaCompliancePct}%`,
-      detail: 'Target: 85.0% threshold met',
-      status: 'healthy',
+      detail: metrics.slaCompliancePct >= 85 ? 'Target: 85.0% threshold met' : 'Target: 85.0% threshold at risk',
+      status: metrics.slaCompliancePct >= 85 ? 'healthy' : 'critical',
       group: 'Service Level'
     },
     {
@@ -58,16 +62,16 @@ export const ExecutiveMetricLedger: React.FC<ExecutiveMetricLedgerProps> = ({ me
           <span className="w-1.5 h-1.5 rounded-full bg-slate-400" />
           <span className="font-semibold text-slate-700 tracking-tight">Executive Metric Ledger</span>
           <span className="text-slate-400">|</span>
-          <span className="text-slate-500 text-[11px]">Governed Baseline Metrics ($N = 8,000$)</span>
+          <span className="text-slate-500 text-[11px]">Governed Baseline Metrics (N = 8,000)</span>
         </div>
         <span className="text-[10px] font-mono text-slate-500 uppercase tracking-wider">
           Calendar Hours (24/7)
         </span>
       </div>
 
-      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 divide-y sm:divide-y-0 sm:divide-x divide-slate-100">
+      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-px bg-slate-100">
         {items.map((item, idx) => (
-          <div key={idx} className="p-4 flex flex-col justify-between hover:bg-slate-50/50 transition-colors">
+          <div key={idx} className="p-4 flex flex-col justify-between bg-surface hover:bg-slate-50/50 transition-colors">
             <div>
               <div className="flex items-center justify-between gap-1 mb-1.5">
                 <span className="text-[10px] font-semibold text-slate-500 uppercase tracking-wider">

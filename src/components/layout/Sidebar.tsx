@@ -24,22 +24,30 @@ import {
   ChevronLeft,
   ChevronRight,
   Headphones,
-  UploadCloud
+  UploadCloud,
+  X
 } from 'lucide-react';
 
 interface SidebarProps {
   collapsed: boolean;
   onToggleCollapse: () => void;
+  onNavigate?: () => void;
+  isMobileDrawer?: boolean;
 }
 
-export const Sidebar: React.FC<SidebarProps> = ({ collapsed, onToggleCollapse }) => {
-  const { user } = useAuth();
+export const Sidebar: React.FC<SidebarProps> = ({
+  collapsed,
+  onToggleCollapse,
+  onNavigate,
+  isMobileDrawer = false
+}) => {
+  const { user, authMode, isDemoAuth } = useAuth();
   const role = user?.role || 'employee';
 
   const navItemClass = ({ isActive }: { isActive: boolean }) =>
-    `flex items-center gap-2.5 px-3 py-2 rounded-lg text-xs font-medium transition-all group ${
+    `flex items-center gap-2.5 px-3 py-2 rounded-lg text-xs font-medium transition-all group focus-visible:ring-2 focus-visible:ring-brand-500 focus-visible:ring-offset-1 ${
       isActive
-        ? 'bg-brand-50/80 text-brand-700 font-semibold border-l-2 border-brand-600 pl-2.5 shadow-xs'
+        ? 'bg-brand-50/90 text-brand-700 font-semibold border-l-2 border-brand-600 pl-2.5 shadow-xs'
         : 'text-text-secondary hover:text-text-primary hover:bg-slate-100/70'
     }`;
 
@@ -72,13 +80,24 @@ export const Sidebar: React.FC<SidebarProps> = ({ collapsed, onToggleCollapse })
               <Headphones className="w-4 h-4" />
             </div>
           )}
-          <button
-            onClick={onToggleCollapse}
-            aria-label={collapsed ? "Expand sidebar" : "Collapse sidebar"}
-            className="p-1.5 rounded-md text-slate-400 hover:text-text-primary hover:bg-slate-100 hidden md:flex transition-colors border border-transparent hover:border-border"
-          >
-            {collapsed ? <ChevronRight className="w-4 h-4" /> : <ChevronLeft className="w-4 h-4" />}
-          </button>
+
+          {isMobileDrawer ? (
+            <button
+              onClick={onToggleCollapse}
+              aria-label="Close navigation menu"
+              className="p-1.5 rounded-md text-slate-500 hover:text-text-primary hover:bg-slate-100 transition-colors border border-transparent hover:border-border"
+            >
+              <X className="w-5 h-5" />
+            </button>
+          ) : (
+            <button
+              onClick={onToggleCollapse}
+              aria-label={collapsed ? "Expand sidebar" : "Collapse sidebar"}
+              className="p-1.5 rounded-md text-slate-400 hover:text-text-primary hover:bg-slate-100 hidden md:flex transition-colors border border-transparent hover:border-border"
+            >
+              {collapsed ? <ChevronRight className="w-4 h-4" /> : <ChevronLeft className="w-4 h-4" />}
+            </button>
+          )}
         </div>
 
         {/* Navigation list */}
@@ -87,28 +106,28 @@ export const Sidebar: React.FC<SidebarProps> = ({ collapsed, onToggleCollapse })
           {(role === 'employee' || role === 'admin' || role === 'manager') && (
             <div>
               {!collapsed && (
-                <p className="px-3 text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1.5">
+                <p className="px-3 text-[10px] font-bold text-slate-600 uppercase tracking-wider mb-1.5">
                   Employee Self-Service
                 </p>
               )}
               <nav className="space-y-0.5">
-                <NavLink to="/portal" end className={navItemClass} title="Employee Portal">
+                <NavLink to="/portal" end onClick={onNavigate} className={navItemClass} title="Employee Portal">
                   <Home className="w-4 h-4 flex-shrink-0" />
                   {!collapsed && <span>Portal Home</span>}
                 </NavLink>
-                <NavLink to="/portal/tickets" className={navItemClass} title="My Tickets">
+                <NavLink to="/portal/tickets" onClick={onNavigate} className={navItemClass} title="My Tickets">
                   <TicketIcon className="w-4 h-4 flex-shrink-0" />
                   {!collapsed && <span>My Tickets</span>}
                 </NavLink>
-                <NavLink to="/portal/tickets/new" className={navItemClass} title="Create Ticket">
+                <NavLink to="/portal/tickets/new" onClick={onNavigate} className={navItemClass} title="Create Ticket">
                   <PlusCircle className="w-4 h-4 flex-shrink-0 text-brand-600" />
                   {!collapsed && <span>Create Ticket</span>}
                 </NavLink>
-                <NavLink to="/portal/assistant" className={navItemClass} title="AI Assistant">
+                <NavLink to="/portal/assistant" onClick={onNavigate} className={navItemClass} title="AI Assistant">
                   <Bot className="w-4 h-4 flex-shrink-0 text-indigo-500" />
                   {!collapsed && <span>AI Support Assistant</span>}
                 </NavLink>
-                <NavLink to="/portal/knowledge" className={navItemClass} title="Knowledge Base">
+                <NavLink to="/portal/knowledge" onClick={onNavigate} className={navItemClass} title="Knowledge Base">
                   <BookOpen className="w-4 h-4 flex-shrink-0" />
                   {!collapsed && <span>Knowledge Base</span>}
                 </NavLink>
@@ -120,20 +139,20 @@ export const Sidebar: React.FC<SidebarProps> = ({ collapsed, onToggleCollapse })
           {(role === 'agent' || role === 'admin' || role === 'manager') && (
             <div>
               {!collapsed && (
-                <p className="px-3 text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1.5">
+                <p className="px-3 text-[10px] font-bold text-slate-600 uppercase tracking-wider mb-1.5">
                   Agent Workspace
                 </p>
               )}
               <nav className="space-y-0.5">
-                <NavLink to="/agent" end className={navItemClass} title="Agent Dashboard">
+                <NavLink to="/agent" end onClick={onNavigate} className={navItemClass} title="Agent Dashboard">
                   <LayoutDashboard className="w-4 h-4 flex-shrink-0" />
                   {!collapsed && <span>Agent Dashboard</span>}
                 </NavLink>
-                <NavLink to="/agent/tickets" className={navItemClass} title="Ticket Queue">
+                <NavLink to="/agent/tickets" onClick={onNavigate} className={navItemClass} title="Ticket Queue">
                   <Layers className="w-4 h-4 flex-shrink-0" />
                   {!collapsed && <span>Ticket Queue</span>}
                 </NavLink>
-                <NavLink to="/agent/workload" className={navItemClass} title="Team Workload">
+                <NavLink to="/agent/workload" onClick={onNavigate} className={navItemClass} title="Team Workload">
                   <Users2 className="w-4 h-4 flex-shrink-0" />
                   {!collapsed && <span>Team Workload</span>}
                 </NavLink>
@@ -145,44 +164,44 @@ export const Sidebar: React.FC<SidebarProps> = ({ collapsed, onToggleCollapse })
           {(role === 'manager' || role === 'admin') && (
             <div>
               {!collapsed && (
-                <p className="px-3 text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1.5">
+                <p className="px-3 text-[10px] font-bold text-slate-600 uppercase tracking-wider mb-1.5">
                   Service Intelligence
                 </p>
               )}
               <nav className="space-y-0.5">
-                <NavLink to="/analytics/overview" className={navItemClass} title="Executive Overview">
+                <NavLink to="/analytics/overview" onClick={onNavigate} className={navItemClass} title="Executive Dashboard">
                   <BarChart3 className="w-4 h-4 flex-shrink-0" />
-                  {!collapsed && <span>Executive Overview</span>}
+                  {!collapsed && <span>Executive Dashboard</span>}
                 </NavLink>
-                <NavLink to="/analytics/trends" className={navItemClass} title="Ticket Trends">
+                <NavLink to="/analytics/trends" onClick={onNavigate} className={navItemClass} title="Ticket Trends">
                   <TrendingUp className="w-4 h-4 flex-shrink-0" />
                   {!collapsed && <span>Ticket Trends</span>}
                 </NavLink>
-                <NavLink to="/analytics/resolution" className={navItemClass} title="Resolution Time">
+                <NavLink to="/analytics/resolution" onClick={onNavigate} className={navItemClass} title="Resolution Time">
                   <Clock className="w-4 h-4 flex-shrink-0" />
                   {!collapsed && <span>Resolution Time</span>}
                 </NavLink>
-                <NavLink to="/analytics/sla" className={navItemClass} title="SLA Command Center">
+                <NavLink to="/analytics/sla" onClick={onNavigate} className={navItemClass} title="SLA Command Center">
                   <ShieldAlert className="w-4 h-4 flex-shrink-0 text-amber-500" />
                   {!collapsed && <span>SLA Command Center</span>}
                 </NavLink>
-                <NavLink to="/analytics/teams" className={navItemClass} title="Team Performance">
+                <NavLink to="/analytics/teams" onClick={onNavigate} className={navItemClass} title="Team Performance">
                   <Users2 className="w-4 h-4 flex-shrink-0" />
                   {!collapsed && <span>Team Performance</span>}
                 </NavLink>
-                <NavLink to="/analytics/departments" className={navItemClass} title="Department Demand">
+                <NavLink to="/analytics/departments" onClick={onNavigate} className={navItemClass} title="Department Demand">
                   <Building2 className="w-4 h-4 flex-shrink-0" />
                   {!collapsed && <span>Departments</span>}
                 </NavLink>
-                <NavLink to="/analytics/issues" className={navItemClass} title="Recurring Issues">
+                <NavLink to="/analytics/issues" onClick={onNavigate} className={navItemClass} title="Recurring Issues">
                   <AlertTriangle className="w-4 h-4 flex-shrink-0" />
                   {!collapsed && <span>Recurring Issues</span>}
                 </NavLink>
-                <NavLink to="/analytics/predictions" className={navItemClass} title="ML Predictions">
+                <NavLink to="/analytics/predictions" onClick={onNavigate} className={navItemClass} title="ML Predictions">
                   <BrainCircuit className="w-4 h-4 flex-shrink-0 text-indigo-500" />
                   {!collapsed && <span>ML Predictions</span>}
                 </NavLink>
-                <NavLink to="/analytics/reports" className={navItemClass} title="Reports & Export">
+                <NavLink to="/analytics/reports" onClick={onNavigate} className={navItemClass} title="Reports & Export">
                   <FileSpreadsheet className="w-4 h-4 flex-shrink-0" />
                   {!collapsed && <span>Reports & Export</span>}
                 </NavLink>
@@ -194,42 +213,45 @@ export const Sidebar: React.FC<SidebarProps> = ({ collapsed, onToggleCollapse })
           {(role === 'admin' || role === 'manager') && (
             <div>
               {!collapsed && (
-                <p className="px-3 text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1.5">
+                <p className="px-3 text-[10px] font-bold text-slate-600 uppercase tracking-wider mb-1.5">
                   Administration & Data
                 </p>
               )}
               <nav className="space-y-0.5">
-                <NavLink to="/admin" end className={navItemClass} title="Admin Overview">
+                <NavLink to="/admin" end onClick={onNavigate} className={navItemClass} title="Admin Overview">
                   <Settings className="w-4 h-4 flex-shrink-0" />
                   {!collapsed && <span>Admin Overview</span>}
                 </NavLink>
-                <NavLink to="/admin/data" className={navItemClass} title="Data Workbench & QA">
+                <NavLink to="/admin/data" onClick={onNavigate} className={navItemClass} title="Data Workbench & QA">
                   <Database className="w-4 h-4 flex-shrink-0 text-brand-600" />
                   {!collapsed && <span>Data Workbench</span>}
                 </NavLink>
-                <NavLink to="/admin/upload" className={navItemClass} title="Dataset Ingestion & Upload">
-                  <UploadCloud className="w-4 h-4 flex-shrink-0 text-sky-500" />
-                  {!collapsed && <span>Data Ingestion</span>}
-                </NavLink>
-                <NavLink to="/admin/sla" className={navItemClass} title="SLA Configuration">
-                  <ShieldAlert className="w-4 h-4 flex-shrink-0" />
-                  {!collapsed && <span>SLA Policy Rules</span>}
-                </NavLink>
-                <NavLink to="/admin/users" className={navItemClass} title="Users & Roles">
-                  <Users2 className="w-4 h-4 flex-shrink-0" />
-                  {!collapsed && <span>User Management</span>}
-                </NavLink>
-                <NavLink to="/admin/security" className={navItemClass} title="Security Settings">
-                  <ShieldCheck className="w-4 h-4 flex-shrink-0" />
-                  {!collapsed && <span>Security & MFA</span>}
-                </NavLink>
+                {role === 'admin' && (
+                  <>
+                    <NavLink to="/admin/upload" onClick={onNavigate} className={navItemClass} title="Dataset Ingestion & Upload">
+                      <UploadCloud className="w-4 h-4 flex-shrink-0 text-sky-500" />
+                      {!collapsed && <span>Data Ingestion</span>}
+                    </NavLink>
+                    <NavLink to="/admin/sla" onClick={onNavigate} className={navItemClass} title="SLA Configuration">
+                      <ShieldAlert className="w-4 h-4 flex-shrink-0" />
+                      {!collapsed && <span>SLA Policy Rules</span>}
+                    </NavLink>
+                    <NavLink to="/admin/users" onClick={onNavigate} className={navItemClass} title="Users & Roles">
+                      <Users2 className="w-4 h-4 flex-shrink-0" />
+                      {!collapsed && <span>User Management</span>}
+                    </NavLink>
+                    <NavLink to="/admin/security" onClick={onNavigate} className={navItemClass} title="Security Settings">
+                      <ShieldCheck className="w-4 h-4 flex-shrink-0" />
+                      {!collapsed && <span>Security & MFA</span>}
+                    </NavLink>
+                  </>
+                )}
               </nav>
             </div>
           )}
         </div>
       </div>
 
-      {/* Role indicator in sidebar footer */}
       {/* Role indicator and user profile in sidebar footer */}
       {!collapsed && (
         <div className="p-3 border-t border-border bg-surface-subtle m-2 rounded-xl border border-border-subtle shadow-xs">
@@ -240,18 +262,39 @@ export const Sidebar: React.FC<SidebarProps> = ({ collapsed, onToggleCollapse })
               className="w-7 h-7 rounded-full object-cover border border-border flex-shrink-0"
             />
             <div className="min-w-0 flex-1">
-              <p className="text-xs font-bold text-text-primary truncate leading-tight">{user?.name || 'Priya Sharma'}</p>
+              <p className="text-xs font-bold text-text-primary truncate leading-tight">{user?.name || 'Unauthenticated'}</p>
               <p className="text-[10px] text-text-secondary truncate leading-tight">{user?.title || 'User'}</p>
             </div>
           </div>
-          <div className="flex items-center justify-between text-[11px] pt-1.5 border-t border-border-subtle">
-            <span className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider">Persona</span>
-            <span className="font-bold text-brand-700 capitalize bg-brand-50 px-2 py-0.5 rounded text-[10px] border border-brand-200">
-              {role}
-            </span>
+          <div className="pt-2 border-t border-border-subtle space-y-1">
+            <div className="flex items-center justify-between text-[11px]">
+              <span className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider">Role</span>
+              <span className="font-bold text-brand-700 capitalize bg-brand-50 px-2 py-0.5 rounded text-[10px] border border-brand-200">
+                {role}
+              </span>
+            </div>
+            <div className="flex items-center justify-between text-[10px]">
+              <span className="text-slate-400">Mode</span>
+              <span
+                className={`font-semibold px-1.5 py-0.5 rounded text-[9px] border ${
+                  authMode === 'supabase'
+                    ? 'bg-emerald-50 text-emerald-800 border-emerald-200'
+                    : isDemoAuth
+                    ? 'bg-amber-50 text-amber-800 border-amber-200'
+                    : 'bg-slate-100 text-slate-700 border-slate-200'
+                }`}
+              >
+                {authMode === 'supabase'
+                  ? 'Verified Supabase'
+                  : isDemoAuth
+                  ? 'Demo Persona'
+                  : 'Unauthenticated'}
+              </span>
+            </div>
           </div>
         </div>
       )}
     </aside>
   );
 };
+

@@ -1,18 +1,33 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { useNavigate, Link } from 'react-router-dom';
+import { useNavigate, useLocation, Link } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
+import { getDefaultRouteForRole, canAccessRoute } from '../../config/permissions';
 import { Headphones, Shield, ArrowRight, RotateCw, CheckCircle2 } from 'lucide-react';
 
 export const VerifyOtpPage: React.FC = () => {
   const navigate = useNavigate();
-  const { pendingUser, verifyOtp } = useAuth();
+  const location = useLocation();
+  const { pendingUser, verifyOtp, isDemoAuthEnabled } = useAuth();
   const [digits, setDigits] = useState(['', '', '', '', '', '']);
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
   const [countdown, setCountdown] = useState(28);
   const inputRefs = useRef<(HTMLInputElement | null)[]>([]);
 
+  // Extract and sanitize destination to prevent redirect loops
+  const rawFrom = (location.state as any)?.from;
+  const isSafeFrom =
+    rawFrom &&
+    typeof rawFrom === 'string' &&
+    !['/login', '/verify', '/403', '/404'].includes(rawFrom.split('?')[0]);
+  const safeReturn = isSafeFrom ? rawFrom : null;
+
   useEffect(() => {
+    if (!isDemoAuthEnabled) {
+      navigate('/login', { replace: true });
+      return;
+    }
+
     // Focus first input on mount
     inputRefs.current[0]?.focus();
 
@@ -21,7 +36,7 @@ export const VerifyOtpPage: React.FC = () => {
     }, 1000);
 
     return () => clearInterval(timer);
-  }, []);
+  }, [isDemoAuthEnabled, navigate]);
 
   const handleChange = (index: number, value: string) => {
     // Handle single character or paste
@@ -66,12 +81,13 @@ export const VerifyOtpPage: React.FC = () => {
     setLoading(false);
 
     if (res.success) {
-      // Determine landing page based on pending role
-      const role = pendingUser?.role || 'employee';
-      if (role === 'agent') navigate('/agent');
-      else if (role === 'manager') navigate('/analytics/overview');
-      else if (role === 'admin') navigate('/admin');
-      else navigate('/portal');
+      // Determine destination: prioritize safe return target if authorized for role, else default
+      const role = res.user?.role || pendingUser?.role || 'employee';
+      const destination =
+        safeReturn && canAccessRoute(safeReturn, role).allowed
+          ? safeReturn
+          : getDefaultRouteForRole(role);
+      navigate(destination, { replace: true });
     } else {
       setError(res.error || 'Invalid code.');
     }
@@ -99,14 +115,26 @@ export const VerifyOtpPage: React.FC = () => {
 
           <div className="max-w-md mx-auto">
             <h1 className="text-2xl sm:text-3xl font-extrabold text-text-primary tracking-tight">
-              Two-Factor Verification
+              Demo Persona Verification
             </h1>
             <p className="text-sm text-text-secondary mt-1.5 mb-2">
-              Enter the 6-digit code simulated for:
+              Enter the simulated verification code for demo persona:
             </p>
-            <p className="text-xs font-semibold text-text-primary bg-slate-100 px-3 py-1.5 rounded-lg inline-block mb-8">
-              {pendingUser?.email || 'demo@company.com'} ({pendingUser?.role || 'employee'} role)
-            </p>
+            <div className="flex items-center gap-2 mb-4">
+              <span className="text-xs font-semibold text-text-primary bg-slate-100 px-3 py-1.5 rounded-lg border border-slate-200">
+                {pendingUser?.email || 'demo@company.com'} ({pendingUser?.role || 'employee'} role)
+              </span>
+              <span className="text-[10px] font-semibold bg-amber-50 text-amber-800 border border-amber-200 px-2 py-0.5 rounded">
+                Simulated Persona
+              </span>
+            </div>
+
+            <div className="mb-6 p-3 rounded-lg bg-indigo-50/70 border border-indigo-200 text-xs text-indigo-800 flex items-start gap-2">
+              <Shield className="w-4 h-4 text-brand-600 shrink-0 mt-0.5" aria-hidden="true" />
+              <p className="leading-relaxed text-[11px]">
+                <strong>Governance Notice:</strong> This deterministic verification step (test code: <code className="font-mono font-bold bg-indigo-100 px-1 py-0.5 rounded text-brand-700">123456</code>) validates navigation for simulated demo personas only. It does not authenticate or grant privileges to a production Supabase account.
+              </p>
+            </div>
 
             {error && (
               <div className="mb-4 p-3 rounded-lg bg-red-50 border border-red-200 text-xs text-red-700">

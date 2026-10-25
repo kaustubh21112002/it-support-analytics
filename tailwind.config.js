@@ -13,8 +13,8 @@ export default {
         'surface-subtle': '#F8FAFC',
         'surface-elevated': '#FFFFFF',
         'text-primary': '#0F172A',
-        'text-secondary': '#64748B',
-        'text-muted': '#94A3B8',
+        'text-secondary': '#475569',
+        'text-muted': '#64748B',
         brand: {
           50: '#EEF2FF',
           100: '#E0E7FF',

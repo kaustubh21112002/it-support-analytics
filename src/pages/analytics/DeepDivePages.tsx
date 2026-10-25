@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
-import { Link } from 'react-router-dom';
-import { dataService } from '../../services/dataService';
+import { Link, useNavigate } from 'react-router-dom';
+import { dataService, useDataService } from '../../services/dataService';
+import { useUrlFilters, buildFilterQueryString } from '../../lib/urlFilters';
 import { PageHeader } from '../../components/common/PageHeader';
 import { FilterBar } from '../../components/common/FilterBar';
 import { KpiCard } from '../../components/common/KpiCard';
@@ -36,9 +37,19 @@ import {
 
 // 1. TicketTrendsPage
 export const TicketTrendsPage: React.FC = () => {
-  const [departmentId, setDepartmentId] = useState<string>('All');
+  useDataService();
+  const {
+    departmentId,
+    priority,
+    setDepartmentId,
+    setPriority,
+    resetFilters
+  } = useUrlFilters();
   const departments = dataService.getDepartments();
-  const monthlyTrend = dataService.getMonthlyTrend(departmentId !== 'All' ? Number(departmentId) : undefined);
+  const monthlyTrend = dataService.getMonthlyTrend(
+    departmentId !== 'All' ? Number(departmentId) : undefined,
+    priority !== 'All' ? priority : undefined
+  );
 
   return (
     <div className="space-y-6">
@@ -55,13 +66,15 @@ export const TicketTrendsPage: React.FC = () => {
         departments={departments}
         selectedDepartment={departmentId}
         onDepartmentChange={setDepartmentId}
-        onReset={() => setDepartmentId('All')}
+        selectedPriority={priority}
+        onPriorityChange={setPriority}
+        onReset={resetFilters}
       />
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         <ChartCard
           title="Monthly Created vs. Resolved Tickets"
-          subtitle="Total volume comparison by calendar month"
+          subtitle="Governed Seeded Baseline · Total volume comparison by calendar month (FY2024)"
           takeaway="Consistent resolution throughput observed across quarters, preventing systemic queue ballooning."
         >
           <ResponsiveContainer width="100%" height="100%">
@@ -82,7 +95,7 @@ export const TicketTrendsPage: React.FC = () => {
 
         <ChartCard
           title="Average Monthly Resolution Time"
-          subtitle="Monthly average duration in calendar hours"
+          subtitle="Governed Seeded Baseline · Monthly average duration in calendar hours (FY2024)"
           takeaway="Average turnaround stayed between 13.2h and 16.4h, reflecting stable service group capacity."
         >
           <ResponsiveContainer width="100%" height="100%">
@@ -112,15 +125,22 @@ export const TicketTrendsPage: React.FC = () => {
 
 // 2. ResolutionPerformancePage
 export const ResolutionPerformancePage: React.FC = () => {
-  const metrics = dataService.getSummaryMetrics();
+  useDataService();
+  const navigate = useNavigate();
+  const {
+    departmentId,
+    priority,
+    setDepartmentId,
+    setPriority,
+    resetFilters
+  } = useUrlFilters();
+  const departments = dataService.getDepartments();
 
-  const durationDistribution = [
-    { range: '< 4 hours', count: 1850, share: 28.0, label: 'Fast Resolution' },
-    { range: '4 - 8 hours', count: 2110, share: 31.9, label: 'Same Day' },
-    { range: '8 - 24 hours', count: 1840, share: 27.8, label: 'Next Day' },
-    { range: '24 - 72 hours', count: 680, share: 10.3, label: 'Multi-Day' },
-    { range: '> 72 hours', count: 132, share: 2.0, label: 'Complex Escalations' }
-  ];
+  const deptNum = departmentId !== 'All' ? Number(departmentId) : undefined;
+  const prioVal = priority !== 'All' ? priority : undefined;
+
+  const metrics = dataService.getSummaryMetrics(deptNum, prioVal);
+  const { distribution, sameDayRate, totalResolved } = dataService.getResolutionDistribution(deptNum, prioVal);
 
   return (
     <div className="space-y-6">
@@ -133,6 +153,15 @@ export const ResolutionPerformancePage: React.FC = () => {
         ]}
       />
 
+      <FilterBar
+        departments={departments}
+        selectedDepartment={departmentId}
+        onDepartmentChange={setDepartmentId}
+        selectedPriority={priority}
+        onPriorityChange={setPriority}
+        onReset={resetFilters}
+      />
+
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
         <KpiCard
           title="Average Resolution Time"
@@ -140,6 +169,7 @@ export const ResolutionPerformancePage: React.FC = () => {
           subtitle="Mean calendar duration"
           icon={Clock}
           variant="brand"
+          onClick={() => navigate(`/agent/tickets${buildFilterQueryString({ status: 'Resolved Outcomes', dept: departmentId, priority })}`)}
         />
         <KpiCard
           title="Median Resolution Time"
@@ -147,23 +177,25 @@ export const ResolutionPerformancePage: React.FC = () => {
           subtitle="50th percentile of resolved"
           icon={Clock}
           variant="healthy"
+          onClick={() => navigate(`/agent/tickets${buildFilterQueryString({ status: 'Resolved Outcomes', dept: departmentId, priority })}`)}
         />
         <KpiCard
           title="Same-Day Resolution Rate"
-          value="59.9%"
-          subtitle="Resolved in under 8 calendar hours"
+          value={`${sameDayRate}%`}
+          subtitle={`${(distribution[0].count + distribution[1].count).toLocaleString()} of ${totalResolved.toLocaleString()} tickets`}
           icon={CheckCircle2}
           variant="healthy"
+          onClick={() => navigate(`/agent/tickets${buildFilterQueryString({ status: 'Resolved Outcomes', dept: departmentId, priority })}`)}
         />
       </div>
 
       <ChartCard
         title="Resolution Time Distribution Histogram"
         subtitle="Resolved tickets partitioned into duration buckets"
-        takeaway="59.9% of all resolved tickets are completed within 8 calendar hours. Only 2.0% require over 72 hours."
+        takeaway={`${sameDayRate}% of resolved tickets were completed within 8 calendar hours. Multi-day or escalated tickets (> 24h) account for ${Math.round((distribution[3].share + distribution[4].share) * 10) / 10}%.`}
       >
         <ResponsiveContainer width="100%" height="100%">
-          <BarChart data={durationDistribution} margin={{ top: 10, right: 20, left: 0, bottom: 0 }}>
+          <BarChart data={distribution} margin={{ top: 10, right: 20, left: 0, bottom: 0 }}>
             <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#E2E8F0" />
             <XAxis dataKey="range" stroke="#64748B" fontSize={11} />
             <YAxis stroke="#64748B" fontSize={11} />
@@ -181,6 +213,7 @@ export const ResolutionPerformancePage: React.FC = () => {
 
 // 3. TeamPerformancePage
 export const TeamPerformancePage: React.FC = () => {
+  useDataService();
   const teamBreakdown = dataService.getTeamBreakdown();
 
   return (
@@ -229,6 +262,7 @@ export const TeamPerformancePage: React.FC = () => {
 
 // 4. DepartmentAnalysisPage
 export const DepartmentAnalysisPage: React.FC = () => {
+  useDataService();
   const deptBreakdown = dataService.getDepartmentBreakdown();
 
   return (
@@ -282,9 +316,11 @@ export const DepartmentAnalysisPage: React.FC = () => {
                 {deptBreakdown.map((d) => (
                   <tr key={d.departmentId} className="hover:bg-slate-50/70">
                     <td className="py-3 px-3 font-semibold text-text-primary">{d.departmentName}</td>
-                    <td className="py-3 px-3 font-medium text-text-primary">{d.ticketCount}</td>
+                    <td className="py-3 px-3 font-medium text-text-primary">{d.ticketCount.toLocaleString()}</td>
                     <td className="py-3 px-3 text-text-secondary">{d.avgResolutionHours}h</td>
-                    <td className="py-3 px-3 font-bold text-emerald-600">★ {d.avgCsat} / 5.0</td>
+                    <td className="py-3 px-3 font-bold text-emerald-600">
+                      {d.avgCsat > 0 ? `★ ${d.avgCsat.toFixed(2)} / 5.0` : 'Unrated'}
+                    </td>
                   </tr>
                 ))}
               </tbody>
@@ -298,7 +334,10 @@ export const DepartmentAnalysisPage: React.FC = () => {
 
 // 5. RecurringIssuesPage
 export const RecurringIssuesPage: React.FC = () => {
-  const topIssues = dataService.getTopIssues();
+  useDataService();
+  const [departmentId, setDepartmentId] = useState<string>('All');
+  const departments = dataService.getDepartments();
+  const topIssues = dataService.getTopIssues(departmentId !== 'All' ? Number(departmentId) : undefined);
 
   return (
     <div className="space-y-6">
@@ -311,10 +350,21 @@ export const RecurringIssuesPage: React.FC = () => {
         ]}
       />
 
+      <FilterBar
+        departments={departments}
+        selectedDepartment={departmentId}
+        onDepartmentChange={setDepartmentId}
+        onReset={() => setDepartmentId('All')}
+      />
+
       <ChartCard
         title="Top Ranked Issue Types by Frequency"
-        subtitle="Total tickets recorded during 2024"
-        takeaway="Laptop hardware battery degradation and VPN timeouts represent top recurring requests."
+        subtitle="Governed Seeded Baseline · 2024 Pareto recurring issue frequency register"
+        takeaway={
+          topIssues.length > 0
+            ? `Top recurring issue is "${topIssues[0].issue}" (${topIssues[0].frequency} incidents), followed by "${topIssues[1]?.issue || ''}".`
+            : 'No recurring incidents recorded for the selected filter.'
+        }
         height="h-64"
       >
         <ResponsiveContainer width="100%" height="100%">
@@ -332,7 +382,8 @@ export const RecurringIssuesPage: React.FC = () => {
       </ChartCard>
 
       <div className="bg-surface rounded-xl border border-border shadow-card p-5">
-        <h3 className="font-bold text-sm text-text-primary mb-3">Top 10 Recurring Incident Breakdown</h3>
+        <h3 className="font-bold text-sm text-text-primary mb-1">Top 10 Recurring Incident Breakdown</h3>
+        <p className="text-xs text-text-secondary mb-3">Longitudinal incident frequency and impact tiering across the dataset</p>
         <div className="overflow-x-auto">
           <table className="w-full text-left border-collapse text-xs">
             <thead>
@@ -345,15 +396,23 @@ export const RecurringIssuesPage: React.FC = () => {
               </tr>
             </thead>
             <tbody className="divide-y divide-border">
-              {topIssues.map((issue, idx) => (
-                <tr key={idx} className="hover:bg-slate-50/70">
-                  <td className="py-3 px-3 font-semibold text-text-primary">{issue.issue}</td>
-                  <td className="py-3 px-3 text-text-secondary">{issue.category}</td>
-                  <td className="py-3 px-3 font-bold text-brand-600">{issue.frequency}</td>
-                  <td className="py-3 px-3 text-text-secondary">{issue.avgResolutionHours}h</td>
-                  <td className="py-3 px-3 font-semibold text-red-600">{issue.breachRatePct}%</td>
+              {topIssues.length === 0 ? (
+                <tr>
+                  <td colSpan={5} className="py-8 text-center text-slate-400">
+                    No recurring incidents recorded for the selected department.
+                  </td>
                 </tr>
-              ))}
+              ) : (
+                topIssues.map((issue, idx) => (
+                  <tr key={idx} className="hover:bg-slate-50/70">
+                    <td className="py-3 px-3 font-semibold text-text-primary">{issue.issue}</td>
+                    <td className="py-3 px-3 text-text-secondary">{issue.category}</td>
+                    <td className="py-3 px-3 font-bold text-brand-600">{issue.frequency}</td>
+                    <td className="py-3 px-3 text-text-secondary">{issue.avgResolutionHours}h</td>
+                    <td className="py-3 px-3 font-semibold text-red-600">{issue.breachRatePct}%</td>
+                  </tr>
+                ))
+              )}
             </tbody>
           </table>
         </div>
@@ -364,9 +423,14 @@ export const RecurringIssuesPage: React.FC = () => {
 
 // 6. ReportsExportPage
 export const ReportsExportPage: React.FC = () => {
+  useDataService();
+  const {
+    status,
+    priority,
+    setStatus,
+    setPriority
+  } = useUrlFilters();
   const [reportType, setReportType] = useState('all_tickets');
-  const [status, setStatus] = useState('All');
-  const [priority, setPriority] = useState('All');
   const [exported, setExported] = useState(false);
 
   const { tickets } = dataService.getTickets({ status, priority });
@@ -418,8 +482,10 @@ export const ReportsExportPage: React.FC = () => {
               className="w-full px-3 py-2 text-xs border border-border rounded-lg bg-slate-50 focus:bg-white"
             >
               <option value="All">All Statuses</option>
+              <option value="Active Backlog">Active Backlog (Open / In Progress / Pending)</option>
               <option value="Open">Open</option>
               <option value="In Progress">In Progress</option>
+              <option value="Pending">Pending</option>
               <option value="Resolved">Resolved</option>
               <option value="Closed">Closed</option>
             </select>
@@ -451,8 +517,16 @@ export const ReportsExportPage: React.FC = () => {
           </div>
           <div className="flex items-center justify-between">
             <span className="text-text-secondary">Dataset Authenticity:</span>
-            <span className="text-amber-800 bg-amber-100 px-2 py-0.5 rounded text-[11px] font-semibold">
-              Synthetic Governed Baseline (Seed 42)
+            <span
+              className={`px-2 py-0.5 rounded text-[11px] font-semibold ${
+                dataService.getDataProvenance().dataSource === 'live'
+                  ? 'text-emerald-800 bg-emerald-100'
+                  : 'text-amber-800 bg-amber-100'
+              }`}
+            >
+              {dataService.getDataProvenance().dataSource === 'live'
+                ? 'Live Governed Dataset (Supabase Hydrated)'
+                : 'Synthetic Governed Baseline (Seed 42)'}
             </span>
           </div>
         </div>

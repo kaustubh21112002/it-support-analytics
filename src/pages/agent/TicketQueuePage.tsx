@@ -1,19 +1,33 @@
-import React, { useState } from 'react';
+import React from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { dataService } from '../../services/dataService';
+import { dataService, useDataSync } from '../../services/dataService';
 import { PageHeader } from '../../components/common/PageHeader';
 import { FilterBar } from '../../components/common/FilterBar';
 import { DataTable, Column } from '../../components/common/DataTable';
 import { StatusBadge, PriorityBadge, SLAStatusIndicator } from '../../components/common/Badges';
-import { Ticket, TicketStatus } from '../../types';
+import { Ticket } from '../../types';
 import { Download, Eye, RefreshCw } from 'lucide-react';
+import { useUrlFilters } from '../../lib/urlFilters';
 
 export const TicketQueuePage: React.FC = () => {
   const navigate = useNavigate();
-  const [search, setSearch] = useState('');
-  const [status, setStatus] = useState('All');
-  const [priority, setPriority] = useState('All');
-  const [departmentId, setDepartmentId] = useState<string>('All');
+  // Reactively re-renders when Supabase live data finishes loading
+  const { hydrationStatus, ticketCount } = useDataSync();
+
+  // URL-synchronized filters
+  const {
+    departmentId,
+    priority,
+    status,
+    sla,
+    search,
+    setDepartmentId,
+    setPriority,
+    setStatus,
+    setSla,
+    setSearch,
+    resetFilters
+  } = useUrlFilters();
 
   const departments = dataService.getDepartments();
   const categories = dataService.getCategories();
@@ -24,7 +38,8 @@ export const TicketQueuePage: React.FC = () => {
     search,
     status,
     priority,
-    departmentId: departmentId !== 'All' ? Number(departmentId) : undefined
+    departmentId: departmentId !== 'All' ? Number(departmentId) : undefined,
+    sla
   });
 
   const handleExportCsv = () => {
@@ -125,7 +140,8 @@ export const TicketQueuePage: React.FC = () => {
       render: (t) => (
         <button
           onClick={() => navigate(`/agent/tickets/${t.ticket_id}`)}
-          className="inline-flex items-center gap-1 px-2.5 py-1 text-xs font-semibold text-brand-700 bg-brand-50 hover:bg-brand-100 rounded transition-colors"
+          aria-label={`Triage ticket ${t.ticket_id}`}
+          className="inline-flex items-center gap-1 px-2.5 py-1 text-xs font-semibold text-brand-700 bg-brand-50 hover:bg-brand-100 rounded transition-colors focus-visible:ring-2 focus-visible:ring-brand-500"
         >
           <Eye className="w-3 h-3" />
           <span>Triage</span>
@@ -146,7 +162,7 @@ export const TicketQueuePage: React.FC = () => {
         actions={
           <button
             onClick={handleExportCsv}
-            className="inline-flex items-center gap-2 px-3.5 py-2 bg-surface hover:bg-slate-50 text-text-primary border border-border rounded-lg text-xs font-semibold shadow-sm transition-all"
+            className="inline-flex items-center gap-2 px-3.5 py-2 bg-surface hover:bg-slate-50 text-text-primary border border-border rounded-lg text-xs font-semibold shadow-sm transition-all focus-visible:ring-2 focus-visible:ring-brand-500"
           >
             <Download className="w-4 h-4 text-slate-500" />
             <span>Export Filtered CSV</span>
@@ -162,14 +178,11 @@ export const TicketQueuePage: React.FC = () => {
         onStatusChange={setStatus}
         selectedPriority={priority}
         onPriorityChange={setPriority}
+        selectedSla={sla}
+        onSlaChange={setSla}
         searchQuery={search}
         onSearchChange={setSearch}
-        onReset={() => {
-          setSearch('');
-          setStatus('All');
-          setPriority('All');
-          setDepartmentId('All');
-        }}
+        onReset={resetFilters}
       />
 
       <DataTable
@@ -177,7 +190,9 @@ export const TicketQueuePage: React.FC = () => {
         data={tickets}
         keyField="ticket_id"
         pageSize={10}
+        loading={hydrationStatus === 'hydrating' && ticketCount === 0}
         onRowClick={(t) => navigate(`/agent/tickets/${t.ticket_id}`)}
+        onResetFilters={resetFilters}
       />
     </div>
   );

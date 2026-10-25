@@ -1,7 +1,7 @@
 import React from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
-import { dataService } from '../../services/dataService';
+import { dataService, useDataService } from '../../services/dataService';
 import { PageHeader } from '../../components/common/PageHeader';
 import { KpiCard } from '../../components/common/KpiCard';
 import { StatusBadge, PriorityBadge } from '../../components/common/Badges';
@@ -18,6 +18,7 @@ import {
 import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip, Legend } from 'recharts';
 
 export const AgentHome: React.FC = () => {
+  useDataService();
   const { user } = useAuth();
   const navigate = useNavigate();
 

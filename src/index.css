@@ -12,7 +12,7 @@
     letter-spacing: -0.011em;
   }
 
-  /* Accessible focus indicators */
+  /* Accessible focus indicators across all interactive elements */
   :focus-visible {
     @apply outline-none ring-2 ring-brand-500 ring-offset-2 ring-offset-surface;
   }
@@ -71,5 +71,88 @@
   background: linear-gradient(90deg, #F1F5F9 25%, #E2E8F0 50%, #F1F5F9 75%);
   background-size: 200% 100%;
   animation: shimmer 1.5s infinite;
+}
+
+/* Accessibility: Respect reduced motion preferences */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+
+/* MIS Executive Reporting: High-density Print Stylesheet */
+@media print {
+  /* Hide non-printable navigation chrome, interactive filters, drawers, and buttons */
+  aside,
+  nav,
+  header,
+  footer,
+  .print\:hidden,
+  button,
+  .sr-only,
+  #mobile-navigation-drawer,
+  a[href="#main-content"] {
+    display: none !important;
+  }
+
+  /* Reset body and container backgrounds for pristine paper rendering */
+  body {
+    background: #FFFFFF !important;
+    color: #0F172A !important;
+    font-size: 11pt !important;
+    line-height: 1.4 !important;
+    margin: 0 !important;
+    padding: 0 !important;
+  }
+
+  main,
+  #main-content {
+    max-width: 100% !important;
+    margin: 0 !important;
+    padding: 0.5in !important;
+  }
+
+  /* Eliminate shadows and use crisp hairline borders */
+  .shadow-card,
+  .shadow-xs,
+  .shadow-sm,
+  .shadow-md,
+  .shadow-lg,
+  .shadow-xl,
+  .shadow-2xl,
+  .shadow-popover {
+    box-shadow: none !important;
+  }
+
+  /* Ensure background colors and meters print faithfully */
+  * {
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
+  }
+
+  /* Avoid breaking inside cards, key sections, and table rows */
+  .bg-surface,
+  tr,
+  .its-panel {
+    page-break-inside: avoid !important;
+    break-inside: avoid !important;
+  }
+
+  /* Force page breaks before major sections when needed */
+  .page-break-before {
+    page-break-before: always !important;
+    break-before: page !important;
+  }
+
+  /* Ensure links are readable without interactive underlining */
+  a {
+    text-decoration: none !important;
+    color: inherit !important;
+  }
 }
 

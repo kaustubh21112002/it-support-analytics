@@ -3,13 +3,12 @@ import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { AuthProvider } from './context/AuthContext';
 import { AppShell } from './components/layout/AppShell';
 
-// Route Loading Spinner Fallback
+import { DashboardSkeleton } from './components/common/Skeleton';
+
+// Route Loading Skeleton Fallback
 const RouteLoadingFallback: React.FC = () => (
-  <div className="flex items-center justify-center min-h-[45vh] p-8">
-    <div className="flex flex-col items-center gap-2.5">
-      <div className="w-7 h-7 rounded-full border-2 border-brand-200 border-t-brand-600 animate-spin" />
-      <span className="text-xs font-medium text-text-secondary">Loading view...</span>
-    </div>
+  <div className="p-4 sm:p-6 lg:p-8 max-w-7xl mx-auto w-full">
+    <DashboardSkeleton pageTitle="View" />
   </div>
 );
 
@@ -59,63 +58,274 @@ const SecuritySettingsPage = React.lazy(() => import('./pages/admin/AdminPages')
 const NotificationsPage = React.lazy(() => import('./pages/shared/SharedPages').then(m => ({ default: m.NotificationsPage })));
 const ProfilePage = React.lazy(() => import('./pages/shared/SharedPages').then(m => ({ default: m.ProfilePage })));
 
+import { ProtectedRoute } from './components/auth/ProtectedRoute';
+import { ErrorBoundary } from './components/common/ErrorBoundary';
+export { ErrorBoundary };
+
 export const App: React.FC = () => {
   return (
     <BrowserRouter>
       <AuthProvider>
-        <Suspense fallback={<RouteLoadingFallback />}>
-          <Routes>
-          {/* Public routes without AppShell */}
-          <Route path="/" element={<LandingPage />} />
-          <Route path="/login" element={<LoginPage />} />
-          <Route path="/verify" element={<VerifyOtpPage />} />
-          <Route path="/forgot-password" element={<ForgotPasswordPage />} />
-          <Route path="/reset-password" element={<ResetPasswordPage />} />
-          <Route path="/403" element={<ForbiddenPage />} />
+        <ErrorBoundary>
+          <Suspense fallback={<RouteLoadingFallback />}>
+            <Routes>
+            {/* Public routes without AppShell */}
+            <Route path="/" element={<LandingPage />} />
+            <Route path="/login" element={<LoginPage />} />
+            <Route path="/verify" element={<VerifyOtpPage />} />
+            <Route path="/forgot-password" element={<ForgotPasswordPage />} />
+            <Route path="/reset-password" element={<ResetPasswordPage />} />
+            <Route path="/403" element={<ForbiddenPage />} />
 
-          {/* Authenticated routes with AppShell */}
-          {/* Employee portal */}
-          <Route path="/portal" element={<AppShell><EmployeeHome /></AppShell>} />
-          <Route path="/portal/tickets" element={<AppShell><MyTicketsPage /></AppShell>} />
-          <Route path="/portal/tickets/new" element={<AppShell><CreateTicketPage /></AppShell>} />
-          <Route path="/portal/tickets/:id" element={<AppShell><EmployeeTicketDetail /></AppShell>} />
-          <Route path="/portal/assistant" element={<AppShell><AIAssistantPage /></AppShell>} />
-          <Route path="/portal/knowledge" element={<AppShell><KnowledgeBasePage /></AppShell>} />
+            {/* Authenticated routes with AppShell and ProtectedRoute guards */}
+            {/* Employee portal */}
+            <Route
+              path="/portal"
+              element={
+                <ProtectedRoute allowedRoles={['employee', 'manager', 'admin']}>
+                  <AppShell><EmployeeHome /></AppShell>
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/portal/tickets"
+              element={
+                <ProtectedRoute allowedRoles={['employee', 'agent', 'manager', 'admin']}>
+                  <AppShell><MyTicketsPage /></AppShell>
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/portal/tickets/new"
+              element={
+                <ProtectedRoute allowedRoles={['employee', 'agent', 'manager', 'admin']}>
+                  <AppShell><CreateTicketPage /></AppShell>
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/portal/tickets/:id"
+              element={
+                <ProtectedRoute allowedRoles={['employee', 'agent', 'manager', 'admin']}>
+                  <AppShell><EmployeeTicketDetail /></AppShell>
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/portal/assistant"
+              element={
+                <ProtectedRoute allowedRoles={['employee', 'agent', 'manager', 'admin']}>
+                  <AppShell><AIAssistantPage /></AppShell>
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/portal/knowledge"
+              element={
+                <ProtectedRoute allowedRoles={['employee', 'agent', 'manager', 'admin']}>
+                  <AppShell><KnowledgeBasePage /></AppShell>
+                </ProtectedRoute>
+              }
+            />
 
-          {/* Agent workspace */}
-          <Route path="/agent" element={<AppShell><AgentHome /></AppShell>} />
-          <Route path="/agent/tickets" element={<AppShell><TicketQueuePage /></AppShell>} />
-          <Route path="/agent/tickets/:id" element={<AppShell><AgentTicketDetail /></AppShell>} />
-          <Route path="/agent/workload" element={<AppShell><WorkloadPage /></AppShell>} />
+            {/* Agent workspace */}
+            <Route
+              path="/agent"
+              element={
+                <ProtectedRoute allowedRoles={['agent', 'manager', 'admin']}>
+                  <AppShell><AgentHome /></AppShell>
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/agent/tickets"
+              element={
+                <ProtectedRoute allowedRoles={['agent', 'manager', 'admin']}>
+                  <AppShell><TicketQueuePage /></AppShell>
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/agent/tickets/:id"
+              element={
+                <ProtectedRoute allowedRoles={['agent', 'manager', 'admin']}>
+                  <AppShell><AgentTicketDetail /></AppShell>
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/tickets/:id"
+              element={
+                <ProtectedRoute allowedRoles={['agent', 'manager', 'admin']}>
+                  <AppShell><AgentTicketDetail /></AppShell>
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/agent/workload"
+              element={
+                <ProtectedRoute allowedRoles={['agent', 'manager', 'admin']}>
+                  <AppShell><WorkloadPage /></AppShell>
+                </ProtectedRoute>
+              }
+            />
 
-          {/* Management analytics */}
-          <Route path="/analytics/overview" element={<AppShell><AnalyticsOverview /></AppShell>} />
-          <Route path="/analytics/trends" element={<AppShell><TicketTrendsPage /></AppShell>} />
-          <Route path="/analytics/resolution" element={<AppShell><ResolutionPerformancePage /></AppShell>} />
-          <Route path="/analytics/sla" element={<AppShell><SlaCommandCenterPage /></AppShell>} />
-          <Route path="/analytics/teams" element={<AppShell><TeamPerformancePage /></AppShell>} />
-          <Route path="/analytics/departments" element={<AppShell><DepartmentAnalysisPage /></AppShell>} />
-          <Route path="/analytics/issues" element={<AppShell><RecurringIssuesPage /></AppShell>} />
-          <Route path="/analytics/predictions" element={<AppShell><PredictionsPage /></AppShell>} />
-          <Route path="/analytics/reports" element={<AppShell><ReportsExportPage /></AppShell>} />
+            {/* Management analytics */}
+            <Route
+              path="/analytics/overview"
+              element={
+                <ProtectedRoute allowedRoles={['manager', 'admin']}>
+                  <AppShell><AnalyticsOverview /></AppShell>
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/analytics/executive"
+              element={
+                <ProtectedRoute allowedRoles={['manager', 'admin']}>
+                  <AppShell><AnalyticsOverview /></AppShell>
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/analytics/trends"
+              element={
+                <ProtectedRoute allowedRoles={['manager', 'admin']}>
+                  <AppShell><TicketTrendsPage /></AppShell>
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/analytics/resolution"
+              element={
+                <ProtectedRoute allowedRoles={['manager', 'admin']}>
+                  <AppShell><ResolutionPerformancePage /></AppShell>
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/analytics/sla"
+              element={
+                <ProtectedRoute allowedRoles={['manager', 'admin']}>
+                  <AppShell><SlaCommandCenterPage /></AppShell>
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/analytics/teams"
+              element={
+                <ProtectedRoute allowedRoles={['manager', 'admin']}>
+                  <AppShell><TeamPerformancePage /></AppShell>
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/analytics/departments"
+              element={
+                <ProtectedRoute allowedRoles={['manager', 'admin']}>
+                  <AppShell><DepartmentAnalysisPage /></AppShell>
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/analytics/issues"
+              element={
+                <ProtectedRoute allowedRoles={['manager', 'admin']}>
+                  <AppShell><RecurringIssuesPage /></AppShell>
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/analytics/predictions"
+              element={
+                <ProtectedRoute allowedRoles={['manager', 'admin']}>
+                  <AppShell><PredictionsPage /></AppShell>
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/analytics/reports"
+              element={
+                <ProtectedRoute allowedRoles={['manager', 'admin']}>
+                  <AppShell><ReportsExportPage /></AppShell>
+                </ProtectedRoute>
+              }
+            />
 
-          {/* Administration */}
-          <Route path="/admin" element={<AppShell><AdminOverview /></AppShell>} />
-          <Route path="/admin/users" element={<AppShell><UserManagementPage /></AppShell>} />
-          <Route path="/admin/sla" element={<AppShell><SlaConfigPage /></AppShell>} />
-          <Route path="/admin/data" element={<AppShell><DataWorkbenchPage /></AppShell>} />
-          <Route path="/admin/upload" element={<AppShell><AdminUploadPage /></AppShell>} />
-          <Route path="/admin/security" element={<AppShell><SecuritySettingsPage /></AppShell>} />
+            {/* Administration & Governance */}
+            <Route
+              path="/admin"
+              element={
+                <ProtectedRoute allowedRoles={['admin', 'manager']}>
+                  <AppShell><AdminOverview /></AppShell>
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/admin/users"
+              element={
+                <ProtectedRoute allowedRoles={['admin']}>
+                  <AppShell><UserManagementPage /></AppShell>
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/admin/sla"
+              element={
+                <ProtectedRoute allowedRoles={['admin']}>
+                  <AppShell><SlaConfigPage /></AppShell>
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/admin/data"
+              element={
+                <ProtectedRoute allowedRoles={['admin', 'manager']}>
+                  <AppShell><DataWorkbenchPage /></AppShell>
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/admin/upload"
+              element={
+                <ProtectedRoute allowedRoles={['admin']}>
+                  <AppShell><AdminUploadPage /></AppShell>
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/admin/security"
+              element={
+                <ProtectedRoute allowedRoles={['admin']}>
+                  <AppShell><SecuritySettingsPage /></AppShell>
+                </ProtectedRoute>
+              }
+            />
 
-          {/* Shared pages */}
-          <Route path="/notifications" element={<AppShell><NotificationsPage /></AppShell>} />
-          <Route path="/profile" element={<AppShell><ProfilePage /></AppShell>} />
+            {/* Shared pages */}
+            <Route
+              path="/notifications"
+              element={
+                <ProtectedRoute allowedRoles={['employee', 'agent', 'manager', 'admin']}>
+                  <AppShell><NotificationsPage /></AppShell>
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/profile"
+              element={
+                <ProtectedRoute allowedRoles={['employee', 'agent', 'manager', 'admin']}>
+                  <AppShell><ProfilePage /></AppShell>
+                </ProtectedRoute>
+              }
+            />
 
-          {/* Fallback */}
-          <Route path="/404" element={<NotFoundPage />} />
-          <Route path="*" element={<NotFoundPage />} />
-        </Routes>
-      </Suspense>
+            {/* Fallback */}
+            <Route path="/404" element={<NotFoundPage />} />
+            <Route path="*" element={<NotFoundPage />} />
+          </Routes>
+        </Suspense>
+      </ErrorBoundary>
     </AuthProvider>
   </BrowserRouter>
   );

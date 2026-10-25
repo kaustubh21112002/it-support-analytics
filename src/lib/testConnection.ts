@@ -1,4 +1,4 @@
-import { supabase } from './supabase';
+import { supabase, isSupabaseAvailable } from './supabase';
 
 export interface DepartmentRecord {
   department_id: string | number;
@@ -19,6 +19,14 @@ export interface ConnectionTestResult {
  * Does not expose credentials, modify data, or alter existing services.
  */
 export async function testSupabaseConnection(): Promise<ConnectionTestResult> {
+  if (!supabase || !isSupabaseAvailable) {
+    return {
+      success: false,
+      message: 'Connection test failed: Supabase client is not configured. Check .env.local file.',
+      error: 'Missing VITE_SUPABASE_URL or VITE_SUPABASE_ANON_KEY'
+    };
+  }
+
   try {
     const { data, error } = await supabase
       .from('departments')

@@ -1,12 +1,14 @@
-import React, { useState } from 'react';
+import React from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { dataService } from '../../services/dataService';
+import { dataService, useDataService, useDataSync } from '../../services/dataService';
+import { useUrlFilters, buildFilterQueryString } from '../../lib/urlFilters';
 import { PageHeader } from '../../components/common/PageHeader';
 import { FilterBar } from '../../components/common/FilterBar';
 import { KpiCard } from '../../components/common/KpiCard';
 import { PriorityBadge } from '../../components/common/Badges';
 import { ChartCard } from '../../components/common/ChartCard';
 import { OperationalBriefing } from '../../components/common/OperationalBriefing';
+import { DashboardSkeleton } from '../../components/common/Skeleton';
 import {
   ShieldAlert,
   CheckCircle2,
@@ -30,23 +32,50 @@ import {
 } from 'recharts';
 
 export const SlaCommandCenterPage: React.FC = () => {
+  const { hydrationStatus, ticketCount } = useDataSync();
   const navigate = useNavigate();
-  const [departmentId, setDepartmentId] = useState<string>('All');
-  const [priorityFilter, setPriorityFilter] = useState<string>('All');
+  const {
+    departmentId,
+    priority: priorityFilter,
+    setDepartmentId,
+    setPriority: setPriorityFilter,
+    resetFilters
+  } = useUrlFilters();
+
+  if (hydrationStatus === 'hydrating' && ticketCount === 0) {
+    return <DashboardSkeleton pageTitle="SLA Command Center" />;
+  }
 
   const departments = dataService.getDepartments();
-  const priorityBreakdown = dataService.getPriorityBreakdown();
+  const priorityBreakdown = dataService.getPriorityBreakdown(
+    departmentId !== 'All' ? Number(departmentId) : undefined
+  );
   const atRiskTickets = dataService.getAtRiskTickets();
-  const metrics = dataService.getSummaryMetrics();
+  const metrics = dataService.getSummaryMetrics(
+    departmentId !== 'All' ? Number(departmentId) : undefined,
+    priorityFilter !== 'All' ? priorityFilter : undefined
+  );
+
+  const filteredPriorityBreakdown = priorityFilter !== 'All'
+    ? priorityBreakdown.filter((p) => p.priority === priorityFilter)
+    : priorityBreakdown;
 
   // Data formatted for Recharts comparison
-  const slaChartData = priorityBreakdown.map((p) => ({
+  const slaChartData = filteredPriorityBreakdown.map((p) => ({
     priority: p.priority,
     Compliant: p.compliantCount,
     Breached: p.breachedCount,
     compliancePct: p.compliancePct,
     target: `${p.targetHours}h`
   }));
+
+  let displayAtRisk = atRiskTickets;
+  if (departmentId !== 'All') {
+    displayAtRisk = displayAtRisk.filter((t) => t.department_id === Number(departmentId));
+  }
+  if (priorityFilter !== 'All') {
+    displayAtRisk = displayAtRisk.filter((t) => t.priority === priorityFilter);
+  }
 
   const CustomBarTooltip = ({ active, payload, label }: any) => {
     if (active && payload && payload.length) {
@@ -93,7 +122,7 @@ export const SlaCommandCenterPage: React.FC = () => {
         }}
         primaryAction={{
           label: 'Triage At-Risk Open Tickets',
-          to: '/agent/tickets',
+          to: `/agent/tickets${buildFilterQueryString({ status: 'Active Backlog', sla: 'At Risk', dept: departmentId, priority: priorityFilter })}`,
           icon: Clock
         }}
         secondaryAction={{
@@ -114,10 +143,7 @@ export const SlaCommandCenterPage: React.FC = () => {
         onDepartmentChange={setDepartmentId}
         selectedPriority={priorityFilter}
         onPriorityChange={setPriorityFilter}
-        onReset={() => {
-          setDepartmentId('All');
-          setPriorityFilter('All');
-        }}
+        onReset={resetFilters}
       />
 
       {/* 4 KPIs matching Mockup Screen 12 */}
@@ -128,6 +154,7 @@ export const SlaCommandCenterPage: React.FC = () => {
           subtitle="Resolved denominator for compliance"
           icon={Layers}
           variant="brand"
+          onClick={() => navigate(`/agent/tickets${buildFilterQueryString({ status: 'Resolved Outcomes', dept: departmentId, priority: priorityFilter })}`)}
         />
         <KpiCard
           title="SLA Compliant"
@@ -135,6 +162,7 @@ export const SlaCommandCenterPage: React.FC = () => {
           subtitle="Resolved within target window"
           icon={CheckCircle2}
           variant="healthy"
+          onClick={() => navigate(`/agent/tickets${buildFilterQueryString({ status: 'Resolved Outcomes', sla: 'Compliant', dept: departmentId, priority: priorityFilter })}`)}
         />
         <KpiCard
           title="SLA Breached"
@@ -142,6 +170,7 @@ export const SlaCommandCenterPage: React.FC = () => {
           subtitle="Elapsed time exceeded target"
           icon={AlertTriangle}
           variant="critical"
+          onClick={() => navigate(`/agent/tickets${buildFilterQueryString({ status: 'Resolved Outcomes', sla: 'Breached', dept: departmentId, priority: priorityFilter })}`)}
         />
         <KpiCard
           title="Overall Compliance"
@@ -149,6 +178,7 @@ export const SlaCommandCenterPage: React.FC = () => {
           subtitle="Across all priority bands (85% target)"
           icon={CheckCircle2}
           variant="healthy"
+          onClick={() => navigate(`/analytics/resolution${buildFilterQueryString({ dept: departmentId, priority: priorityFilter })}`)}
         />
       </div>
 
@@ -175,10 +205,10 @@ export const SlaCommandCenterPage: React.FC = () => {
             height="h-80"
           >
             <ResponsiveContainer width="100%" height="100%">
-              <BarChart data={slaChartData} margin={{ top: 20, right: 20, left: 0, bottom: 5 }}>
+              <BarChart data={slaChartData} margin={{ top: 20, right: 20, left: -10, bottom: 5 }}>
                 <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#E2E8F0" />
                 <XAxis dataKey="priority" stroke="#64748B" fontSize={11} tickLine={false} />
-                <YAxis stroke="#64748B" fontSize={11} tickLine={false} />
+                <YAxis stroke="#64748B" fontSize={11} tickLine={false} width={42} />
                 <Tooltip content={<CustomBarTooltip />} />
                 <Legend wrapperStyle={{ fontSize: '11px', paddingTop: '12px' }} />
                 <Bar dataKey="Compliant" fill="#0F9F8F" radius={[4, 4, 0, 0]} />
@@ -216,36 +246,44 @@ export const SlaCommandCenterPage: React.FC = () => {
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-border">
-                  {atRiskTickets.map((t) => (
-                    <tr key={t.ticket_id} className="hover:bg-slate-50/70 transition-colors">
-                      <td className="py-2.5 px-2 font-semibold text-brand-600">
-                        <Link to={`/agent/tickets/${t.ticket_id}`} className="hover:underline">
-                          {t.ticket_id}
-                        </Link>
-                      </td>
-                      <td className="py-2.5 px-2 text-text-primary font-medium max-w-[130px] truncate">
-                        {t.subject || t.issue_type}
-                      </td>
-                      <td className="py-2.5 px-2">
-                        <PriorityBadge priority={t.priority} />
-                      </td>
-                      <td className="py-2.5 px-2">
-                        <span className="font-bold text-red-700 bg-red-50 px-1.5 py-0.5 rounded text-[11px] whitespace-nowrap tabular-nums">
-                          {t.hoursRemaining}h
-                        </span>
-                      </td>
-                      <td className="py-2.5 px-2 text-right">
-                        <button
-                          onClick={() => navigate(`/agent/tickets/${t.ticket_id}`)}
-                          className="p-1.5 rounded-md bg-surface-subtle hover:bg-slate-200 text-slate-700 border border-border"
-                          title="View Ticket"
-                          aria-label={`View ticket ${t.ticket_id}`}
-                        >
-                          <Eye className="w-3.5 h-3.5" />
-                        </button>
+                  {displayAtRisk.length === 0 ? (
+                    <tr>
+                      <td colSpan={5} className="py-6 text-center text-slate-400">
+                        No at-risk tickets matching active filters.
                       </td>
                     </tr>
-                  ))}
+                  ) : (
+                    displayAtRisk.map((t) => (
+                      <tr key={t.ticket_id} className="hover:bg-slate-50/70 transition-colors">
+                        <td className="py-2.5 px-2 font-semibold text-brand-600">
+                          <Link to={`/agent/tickets/${t.ticket_id}`} className="hover:underline">
+                            {t.ticket_id}
+                          </Link>
+                        </td>
+                        <td className="py-2.5 px-2 text-text-primary font-medium max-w-[130px] truncate">
+                          {t.subject || t.issue_type}
+                        </td>
+                        <td className="py-2.5 px-2">
+                          <PriorityBadge priority={t.priority} />
+                        </td>
+                        <td className="py-2.5 px-2">
+                          <span className="font-bold text-red-700 bg-red-50 px-1.5 py-0.5 rounded text-[11px] whitespace-nowrap tabular-nums">
+                            {t.hoursRemaining}h
+                          </span>
+                        </td>
+                        <td className="py-2.5 px-2 text-right">
+                          <button
+                            onClick={() => navigate(`/agent/tickets/${t.ticket_id}`)}
+                            className="p-1.5 rounded-md bg-surface-subtle hover:bg-slate-200 text-slate-700 border border-border focus-visible:ring-2 focus-visible:ring-brand-500 transition-colors"
+                            title="View Ticket"
+                            aria-label={`View ticket ${t.ticket_id}`}
+                          >
+                            <Eye className="w-3.5 h-3.5" />
+                          </button>
+                        </td>
+                      </tr>
+                    ))
+                  )}
                 </tbody>
               </table>
             </div>
@@ -253,7 +291,7 @@ export const SlaCommandCenterPage: React.FC = () => {
 
           <div className="mt-4 pt-3 border-t border-border flex items-center justify-between text-xs">
             <span className="text-text-secondary">Projected risk queue</span>
-            <Link to="/agent/tickets" className="text-brand-600 font-semibold hover:underline flex items-center gap-1">
+            <Link to={`/agent/tickets${buildFilterQueryString({ status: 'Active Backlog', sla: 'At Risk', dept: departmentId, priority: priorityFilter })}`} className="text-brand-600 font-semibold hover:underline flex items-center gap-1">
               <span>View full queue</span>
               <ArrowRight className="w-3 h-3" />
             </Link>

@@ -1,5 +1,5 @@
-import React, { useState } from 'react';
-import { dataService, DEMO_USERS } from '../../services/dataService';
+import React, { useState, useEffect } from 'react';
+import { dataService, useDataService, DEMO_USERS } from '../../services/dataService';
 import { PageHeader } from '../../components/common/PageHeader';
 import { KpiCard } from '../../components/common/KpiCard';
 import { UserRole, SlaRule, TicketPriority } from '../../types';
@@ -24,6 +24,7 @@ import {
 
 // 1. AdminOverview
 export const AdminOverview: React.FC = () => {
+  useDataService();
   const users = dataService.getUsers();
   const audits = dataService.getAuditEvents();
   const workbenchStats = dataService.getDataWorkbenchStats();
@@ -219,10 +220,15 @@ export const UserManagementPage: React.FC = () => {
 
 // 3. SlaConfigPage
 export const SlaConfigPage: React.FC = () => {
+  const version = useDataService();
   const [slaRules, setSlaRules] = useState(dataService.getSlaRules());
   const [editingRuleId, setEditingRuleId] = useState<number | null>(null);
   const [editHours, setEditHours] = useState<number>(24);
   const [successMsg, setSuccessMsg] = useState('');
+
+  useEffect(() => {
+    setSlaRules(dataService.getSlaRules());
+  }, [version]);
 
   const handleSave = (ruleId: number) => {
     dataService.updateSlaRule(ruleId, editHours);
@@ -320,6 +326,7 @@ export const SlaConfigPage: React.FC = () => {
 
 // 4. DataWorkbenchPage
 export const DataWorkbenchPage: React.FC = () => {
+  useDataService();
   const stats = dataService.getDataWorkbenchStats();
   const [tab, setTab] = useState<'qa' | 'dictionary' | 'import'>('qa');
 

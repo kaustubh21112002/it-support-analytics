@@ -66,13 +66,13 @@ export const KpiCard: React.FC<KpiCardProps> = ({
   return (
     <div
       onClick={onClick}
-      className={`bg-surface rounded-xl p-3.5 sm:p-4 border border-border shadow-card hover:shadow-card-hover transition-all duration-200 flex flex-col justify-between ${
+      className={`bg-surface rounded-xl p-3.5 sm:p-4.5 border border-border shadow-card hover:shadow-card-hover transition-all duration-200 flex flex-col justify-between ${
         onClick ? 'cursor-pointer hover:border-brand-300' : ''
       }`}
     >
       <div>
-        <div className="flex items-start justify-between gap-1.5 mb-2">
-          <p className="text-[10px] xl:text-[11px] font-semibold text-text-secondary uppercase tracking-wider leading-snug line-clamp-2">
+        <div className="flex items-start justify-between gap-1.5 mb-1.5 sm:mb-2">
+          <p className="text-xs font-bold text-text-secondary uppercase tracking-wider leading-snug line-clamp-2">
             {title}
           </p>
           {Icon && (
@@ -82,12 +82,12 @@ export const KpiCard: React.FC<KpiCardProps> = ({
           )}
         </div>
 
-        <div className="flex items-baseline gap-2">
-          <h3 className="text-2xl font-bold text-text-primary tracking-tight tabular-nums">
+        <div className="flex items-baseline gap-2 flex-wrap">
+          <h3 className="text-xl sm:text-2xl lg:text-3xl font-bold text-text-primary tracking-tight tabular-nums">
             {value}
           </h3>
           {badge && (
-            <span className={`text-[10px] font-semibold px-1.5 py-0.5 rounded border ${styles.badgeBg}`}>
+            <span className={`text-[10px] font-semibold px-1.5 py-0.5 rounded border leading-tight ${styles.badgeBg}`}>
               {badge}
             </span>
           )}
@@ -95,9 +95,9 @@ export const KpiCard: React.FC<KpiCardProps> = ({
       </div>
 
       {(subtitle || trend) && (
-        <div className="mt-3 pt-2.5 border-t border-border-subtle flex items-center justify-between text-[11px]">
+        <div className="mt-2.5 sm:mt-3 pt-2 sm:pt-2.5 border-t border-border-subtle flex items-center justify-between text-[11px] sm:text-xs">
           {subtitle && (
-            <span className="text-text-secondary leading-snug line-clamp-1">
+            <span className="text-text-secondary leading-snug line-clamp-2">
               {subtitle}
             </span>
           )}

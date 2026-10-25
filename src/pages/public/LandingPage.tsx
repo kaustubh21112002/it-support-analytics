@@ -1,5 +1,6 @@
 import React from 'react';
 import { Link } from 'react-router-dom';
+import { isDemoAuthEnabled } from '../../config/permissions';
 import {
   Headphones,
   ArrowRight,
@@ -19,11 +20,20 @@ import {
 
 export const LandingPage: React.FC = () => {
   const currentYear = new Date().getFullYear();
+  const isDemoEnabled = isDemoAuthEnabled();
 
   return (
     <div className="min-h-screen bg-canvas text-text-primary flex flex-col font-sans selection:bg-brand-500 selection:text-white overflow-x-hidden">
+      {/* Skip to Main Content Link for Keyboard / Screen Reader Accessibility */}
+      <a
+        href="#main-content"
+        className="sr-only focus:not-sr-only focus:fixed focus:top-2 focus:left-2 focus:z-50 focus:px-4 focus:py-2 focus:bg-white focus:text-brand-700 focus:font-semibold focus:rounded-md focus:shadow-md focus:ring-2 focus:ring-brand-500"
+      >
+        Skip to main content
+      </a>
+
       {/* 1. Header Navigation */}
-      <header className="border-b border-slate-200 bg-white/95 backdrop-blur-xs sticky top-0 z-40">
+      <header className="border-b border-slate-200 bg-white/95 backdrop-blur-sm sticky top-0 z-40">
         <nav className="max-w-7xl mx-auto px-4 sm:px-6 h-16 flex items-center justify-between gap-2" aria-label="Main Navigation">
           <div className="flex items-center gap-2.5 min-w-0">
             <div className="w-8 h-8 rounded-lg bg-brand-600 flex items-center justify-center text-white shadow-xs shrink-0">
@@ -58,15 +68,15 @@ export const LandingPage: React.FC = () => {
               to="/login"
               className="px-3 py-1.5 sm:px-4 sm:py-2 text-xs sm:text-sm font-semibold bg-brand-600 hover:bg-brand-700 text-white rounded-lg shadow-xs transition-all flex items-center gap-1 focus:outline-hidden focus:ring-2 focus:ring-brand-500 focus:ring-offset-2"
             >
-              <span className="hidden sm:inline">Explore Demo</span>
-              <span className="sm:hidden">Demo Access</span>
+              <span className="hidden sm:inline">{isDemoEnabled ? 'Explore Demo' : 'Sign In'}</span>
+              <span className="sm:hidden">{isDemoEnabled ? 'Demo Access' : 'Sign In'}</span>
               <ArrowRight className="w-3.5 h-3.5" aria-hidden="true" />
             </Link>
           </div>
         </nav>
       </header>
 
-      <main className="flex-1 overflow-x-hidden">
+      <main id="main-content" className="flex-1 overflow-x-hidden">
         {/* 2. Hero Section: Outcome-led headline, explicit audience & clear CTA hierarchy */}
         <section id="overview" className="max-w-7xl mx-auto px-4 sm:px-6 pt-8 sm:pt-12 pb-16 lg:pt-16 lg:pb-24">
           <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 lg:gap-14 items-center">
@@ -75,7 +85,7 @@ export const LandingPage: React.FC = () => {
               <div className="inline-flex flex-wrap items-center gap-1.5 px-3 py-1 rounded-md bg-slate-100 border border-slate-200 text-slate-800 text-[11px] font-mono font-medium max-w-full">
                 <span className="w-2 h-2 rounded-full bg-emerald-500 shrink-0" aria-hidden="true" />
                 <span>MBA Capstone</span>
-                <span className="text-slate-400">·</span>
+                <span className="text-slate-400" aria-hidden="true">·</span>
                 <span className="text-slate-600 font-semibold">Synthetic Benchmark (8,000 Tickets)</span>
               </div>
 
@@ -93,7 +103,7 @@ export const LandingPage: React.FC = () => {
 
               {/* Audience Callout Bar */}
               <div className="p-3.5 bg-white rounded-xl border border-border shadow-xs">
-                <div className="text-[11px] font-bold uppercase tracking-wider text-slate-500 mb-1.5 flex items-center gap-1.5">
+                <div className="text-[11px] font-bold uppercase tracking-wider text-slate-600 mb-1.5 flex items-center gap-1.5">
                   <Users className="w-3.5 h-3.5 text-brand-600" aria-hidden="true" />
                   <span>Target Audience & Decision Stakeholders</span>
                 </div>
@@ -111,7 +121,7 @@ export const LandingPage: React.FC = () => {
                   to="/login"
                   className="px-6 py-3.5 text-sm font-semibold bg-brand-600 hover:bg-brand-700 text-white rounded-xl shadow-xs transition-all flex items-center justify-center gap-2 focus:outline-hidden focus:ring-2 focus:ring-brand-500 focus:ring-offset-2"
                 >
-                  <span>Explore the Interactive Demo</span>
+                  <span>{isDemoEnabled ? 'Explore the Interactive Demo' : 'Sign In to Workspace'}</span>
                   <ArrowRight className="w-4 h-4" aria-hidden="true" />
                 </Link>
                 <Link
@@ -149,9 +159,9 @@ export const LandingPage: React.FC = () => {
                     <span className="text-[11px] font-bold uppercase tracking-wider text-brand-700 block">
                       Operational Insight Preview
                     </span>
-                    <h3 className="text-base font-bold text-text-primary mt-0.5">
+                    <h2 className="text-base font-bold text-text-primary mt-0.5">
                       SLA Compliance & Queue Health
-                    </h3>
+                    </h2>
                   </div>
                   <span className="text-[10px] font-semibold bg-slate-100 text-slate-700 px-2.5 py-1 rounded-md border border-slate-200 font-mono">
                     Synthetic Demo
@@ -161,17 +171,17 @@ export const LandingPage: React.FC = () => {
                 {/* KPI Summaries derived directly from the synthetic dataset */}
                 <div className="grid grid-cols-3 gap-3">
                   <div className="bg-slate-50/90 p-3 rounded-lg border border-slate-200/80">
-                    <p className="text-[10px] uppercase font-bold text-slate-500">Total Volume</p>
+                    <p className="text-[10px] uppercase font-bold text-slate-600">Total Volume</p>
                     <p className="text-xl font-extrabold text-text-primary mt-0.5 tabular-nums">8,000</p>
                     <p className="text-[10px] text-text-secondary">Calendar Year 2024</p>
                   </div>
                   <div className="bg-slate-50/90 p-3 rounded-lg border border-slate-200/80">
-                    <p className="text-[10px] uppercase font-bold text-slate-500">SLA Compliance</p>
+                    <p className="text-[10px] uppercase font-bold text-slate-600">SLA Compliance</p>
                     <p className="text-xl font-extrabold text-emerald-600 mt-0.5 tabular-nums">87.9%</p>
                     <p className="text-[10px] text-emerald-700 font-medium">Target: 85.0%</p>
                   </div>
                   <div className="bg-slate-50/90 p-3 rounded-lg border border-slate-200/80">
-                    <p className="text-[10px] uppercase font-bold text-slate-500">Mean Turnaround</p>
+                    <p className="text-[10px] uppercase font-bold text-slate-600">Mean Turnaround</p>
                     <p className="text-xl font-extrabold text-brand-600 mt-0.5 tabular-nums">14.9h</p>
                     <p className="text-[10px] text-text-secondary">Median: 7.2h</p>
                   </div>
@@ -181,11 +191,11 @@ export const LandingPage: React.FC = () => {
                 <div className="space-y-3 p-3.5 bg-slate-50 rounded-xl border border-slate-200">
                   <div className="flex items-center justify-between text-xs font-medium">
                     <span className="text-text-primary font-semibold">Resolved Ticket SLA Performance</span>
-                    <span className="text-slate-500">6,612 Resolved (82.7%)</span>
+                    <span className="text-slate-600">6,612 Resolved (82.7%)</span>
                   </div>
 
                   {/* Proportional SLA Breakdown Bar */}
-                  <div className="h-3 w-full bg-slate-200 rounded-full overflow-hidden flex" role="progressbar" aria-valuenow={87.9} aria-valuemin={0} aria-valuemax={100} aria-label="SLA Compliance Rate">
+                  <div className="h-3 w-full bg-slate-200 rounded-full overflow-hidden flex" role="progressbar" aria-valuenow={87.9} aria-valuemin={0} aria-valuemax={100} aria-label="SLA Compliance Rate" aria-valuetext="87.9% compliant">
                     <div className="bg-emerald-600 h-full" style={{ width: '87.9%' }} title="Met SLA: 5,812 tickets (87.9%)" />
                     <div className="bg-rose-500 h-full" style={{ width: '12.1%' }} title="Breached SLA: 800 tickets (12.1%)" />
                   </div>
@@ -232,7 +242,7 @@ export const LandingPage: React.FC = () => {
 
                 {/* Footer preview note */}
                 <div className="flex items-center justify-between text-xs pt-1">
-                  <span className="text-[11px] text-slate-500">
+                  <span className="text-[11px] text-slate-600">
                     Values derived from Seed 42 benchmark
                   </span>
                   <Link
@@ -270,7 +280,7 @@ export const LandingPage: React.FC = () => {
                 <div>
                   <div className="flex items-center justify-between mb-4">
                     <span className="text-2xl font-black font-mono text-brand-600">01</span>
-                    <span className="text-[11px] font-semibold text-slate-500 uppercase tracking-wider px-2 py-0.5 bg-white rounded border border-slate-200">
+                    <span className="text-[11px] font-semibold text-slate-600 uppercase tracking-wider px-2 py-0.5 bg-white rounded border border-slate-200">
                       Capture
                     </span>
                   </div>
@@ -295,7 +305,7 @@ export const LandingPage: React.FC = () => {
                 <div>
                   <div className="flex items-center justify-between mb-4">
                     <span className="text-2xl font-black font-mono text-brand-600">02</span>
-                    <span className="text-[11px] font-semibold text-slate-500 uppercase tracking-wider px-2 py-0.5 bg-white rounded border border-slate-200">
+                    <span className="text-[11px] font-semibold text-slate-600 uppercase tracking-wider px-2 py-0.5 bg-white rounded border border-slate-200">
                       Resolve
                     </span>
                   </div>
@@ -320,7 +330,7 @@ export const LandingPage: React.FC = () => {
                 <div>
                   <div className="flex items-center justify-between mb-4">
                     <span className="text-2xl font-black font-mono text-brand-600">03</span>
-                    <span className="text-[11px] font-semibold text-slate-500 uppercase tracking-wider px-2 py-0.5 bg-white rounded border border-slate-200">
+                    <span className="text-[11px] font-semibold text-slate-600 uppercase tracking-wider px-2 py-0.5 bg-white rounded border border-slate-200">
                       Monitor
                     </span>
                   </div>
@@ -345,7 +355,7 @@ export const LandingPage: React.FC = () => {
                 <div>
                   <div className="flex items-center justify-between mb-4">
                     <span className="text-2xl font-black font-mono text-brand-600">04</span>
-                    <span className="text-[11px] font-semibold text-slate-500 uppercase tracking-wider px-2 py-0.5 bg-white rounded border border-slate-200">
+                    <span className="text-[11px] font-semibold text-slate-600 uppercase tracking-wider px-2 py-0.5 bg-white rounded border border-slate-200">
                       Improve
                     </span>
                   </div>
@@ -376,10 +386,12 @@ export const LandingPage: React.FC = () => {
                 Role-Based Access Control
               </span>
               <h2 className="text-2xl sm:text-3xl font-extrabold tracking-tight">
-                Experience the Four Governed Personas
+                {isDemoEnabled ? 'Experience the Four Governed Personas' : 'The Four Governed Role Personas'}
               </h2>
               <p className="text-sm text-slate-300 mt-2">
-                Test how authorization rules enforce granular permissions, workflow capabilities, and data views across the enterprise.
+                {isDemoEnabled
+                  ? 'Test how authorization rules enforce granular permissions, workflow capabilities, and data views across the enterprise.'
+                  : 'Understand how authorization rules enforce granular permissions, workflow capabilities, and data views across the enterprise.'}
               </p>
             </div>
 
@@ -455,18 +467,18 @@ export const LandingPage: React.FC = () => {
             <p className="font-medium text-text-primary">
               © {currentYear} IT Support Analytics. Built for MBA Business Analytics Evaluation.
             </p>
-            <p className="text-[11px] text-slate-500">
+            <p className="text-[11px] text-slate-600">
               Demonstration application using synthetic data.
             </p>
           </div>
 
-          <div className="flex flex-wrap items-center justify-center gap-3 text-[11px] text-slate-500">
+          <div className="flex flex-wrap items-center justify-center gap-3 text-[11px] text-slate-600">
             <span>8,000 Synthetic Transactions</span>
-            <span>·</span>
+            <span aria-hidden="true">·</span>
             <span>Deterministic Baseline (Seed 42)</span>
-            <span>·</span>
+            <span aria-hidden="true">·</span>
             <Link to="/login" className="text-brand-600 hover:underline font-semibold">
-              Demo Access
+              {isDemoEnabled ? 'Demo Access' : 'Sign In'}
             </Link>
           </div>
         </div>

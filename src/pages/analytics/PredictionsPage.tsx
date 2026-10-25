@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { dataService } from '../../services/dataService';
+import { dataService, useDataService } from '../../services/dataService';
 import { PageHeader } from '../../components/common/PageHeader';
 import { TicketPriority } from '../../types';
 import {
@@ -23,6 +23,7 @@ import {
 } from 'recharts';
 
 export const PredictionsPage: React.FC = () => {
+  useDataService();
   const [tab, setTab] = useState<'predict' | 'performance' | 'importance'>('predict');
   const [categoryId, setCategoryId] = useState<number>(4);
   const [issueType, setIssueType] = useState('VPN Connection');

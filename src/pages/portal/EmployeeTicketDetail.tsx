@@ -1,9 +1,10 @@
 import React, { useState } from 'react';
 import { useParams, Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
-import { dataService } from '../../services/dataService';
+import { dataService, useDataSync } from '../../services/dataService';
 import { StatusBadge, PriorityBadge, SLAStatusIndicator } from '../../components/common/Badges';
 import { PageHeader } from '../../components/common/PageHeader';
+import { TicketDetailSkeleton } from '../../components/common/Skeleton';
 import {
   ArrowLeft,
   Clock,
@@ -20,18 +21,28 @@ export const EmployeeTicketDetail: React.FC = () => {
   const navigate = useNavigate();
   const [replyText, setReplyText] = useState('');
 
+  // Subscribe reactively to Supabase live hydration
+  const { hydrationStatus, ticketCount, isLive } = useDataSync();
+
   const ticket = dataService.getTicketById(id || '');
+
+  if (!ticket && hydrationStatus === 'hydrating') {
+    return <TicketDetailSkeleton ticketId={id} />;
+  }
 
   if (!ticket) {
     return (
       <div className="max-w-md mx-auto py-16 text-center space-y-4">
+        <div className="inline-flex items-center justify-center w-10 h-10 rounded-full bg-red-50 text-red-600 border border-red-100">
+          <AlertCircle className="w-5 h-5" />
+        </div>
         <h2 className="text-xl font-bold text-text-primary">Ticket Not Found</h2>
-        <p className="text-xs text-text-secondary">
-          No ticket matching "{id}" exists in the current demo session.
+        <p className="text-xs text-text-secondary leading-relaxed">
+          No service request matching "{id}" exists in the current ticket store.
         </p>
         <Link
           to="/portal/tickets"
-          className="inline-block px-4 py-2 bg-brand-600 text-white rounded-lg text-xs font-semibold"
+          className="inline-block px-4 py-2 bg-brand-600 text-white rounded-lg text-xs font-semibold hover:bg-brand-700 transition-colors"
         >
           Return to My Tickets
         </Link>
@@ -175,10 +186,11 @@ export const EmployeeTicketDetail: React.FC = () => {
         {/* Reply form */}
         {ticket.status !== 'Closed' ? (
           <form onSubmit={handleSendReply} className="pt-4 border-t border-border space-y-3">
-            <label className="block text-xs font-semibold text-text-primary">
+            <label htmlFor="employee-reply-input" className="block text-xs font-semibold text-text-primary">
               Add a Reply / Additional Information
             </label>
             <textarea
+              id="employee-reply-input"
               rows={3}
               value={replyText}
               onChange={(e) => setReplyText(e.target.value)}
@@ -188,7 +200,8 @@ export const EmployeeTicketDetail: React.FC = () => {
             <div className="flex justify-end">
               <button
                 type="submit"
-                className="px-4 py-2 bg-brand-600 hover:bg-brand-700 text-white font-semibold rounded-lg text-xs shadow-sm flex items-center gap-1.5 transition-all"
+                disabled={!replyText.trim()}
+                className="px-4 py-2 bg-brand-600 hover:bg-brand-700 disabled:opacity-50 text-white font-semibold rounded-lg text-xs shadow-sm flex items-center gap-1.5 transition-all focus-visible:ring-2 focus-visible:ring-brand-500"
               >
                 <Send className="w-3.5 h-3.5" />
                 <span>Send Reply</span>

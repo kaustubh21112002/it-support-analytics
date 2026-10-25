@@ -29,14 +29,18 @@ export const ChartCard: React.FC<ChartCardProps> = ({
           {action && <div className="flex-shrink-0">{action}</div>}
         </div>
 
-        <div className={`w-full ${height} relative`}>
+        <div className={`w-full ${height} relative min-w-0 min-h-0`}>
           {children}
         </div>
       </div>
 
       {takeaway && (
-        <div className="mt-4 pt-3 border-t border-border-subtle flex items-start gap-2 bg-surface-subtle p-3 rounded-lg text-xs text-text-secondary">
-          <Info className="w-3.5 h-3.5 text-brand-600 mt-0.5 flex-shrink-0" />
+        <div
+          className="mt-4 flex items-start gap-2 bg-surface-subtle border border-border-subtle p-3 rounded-lg text-xs text-text-secondary"
+          role="note"
+          aria-label="Observed finding"
+        >
+          <Info className="w-3.5 h-3.5 text-brand-600 mt-0.5 flex-shrink-0" aria-hidden="true" />
           <div className="leading-relaxed">
             <span className="font-semibold text-text-primary">Observed Finding: </span>
             <span>{takeaway}</span>

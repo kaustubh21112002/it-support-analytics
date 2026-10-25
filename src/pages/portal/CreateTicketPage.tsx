@@ -28,6 +28,7 @@ export const CreateTicketPage: React.FC = () => {
   const [issueType, setIssueType] = useState('Active Directory account lock');
   const [attachedFiles, setAttachedFiles] = useState<string[]>([]);
   const [createdTicketId, setCreatedTicketId] = useState<string | null>(null);
+  const [formError, setFormError] = useState<string | null>(null);
 
   const categories = dataService.getCategories();
   const departments = dataService.getDepartments();
@@ -42,13 +43,30 @@ export const CreateTicketPage: React.FC = () => {
     }
   };
 
+  const handleStep1Next = () => {
+    if (!subject.trim()) {
+      setFormError('Please provide a subject or summary for your support request.');
+      return;
+    }
+    if (!description.trim()) {
+      setFormError('Please provide a detailed description of the symptoms and errors encountered.');
+      return;
+    }
+    setFormError(null);
+    setStep(2);
+  };
+
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!subject || !description) return;
+    if (!subject.trim() || !description.trim()) {
+      setFormError('Please complete all required fields before submission.');
+      setStep(1);
+      return;
+    }
 
     const newTicket = dataService.createTicket({
-      subject,
-      description,
+      subject: subject.trim(),
+      description: description.trim(),
       category_id: categoryId,
       issue_type: issueType,
       department_id: user?.departmentId || 4,
@@ -152,14 +170,28 @@ export const CreateTicketPage: React.FC = () => {
           {/* STEP 1: Details */}
           {step === 1 && (
             <div className="space-y-4">
+              {formError && (
+                <div
+                  className="p-3 bg-red-50 border border-red-200 rounded-lg text-xs text-red-700 flex items-center gap-2"
+                  role="alert"
+                >
+                  <AlertTriangle className="w-4 h-4 text-red-500 flex-shrink-0" />
+                  <span>{formError}</span>
+                </div>
+              )}
+
               <div>
-                <label className="block text-xs font-semibold text-text-primary mb-1.5">
+                <label htmlFor="ticket-subject-input" className="block text-xs font-semibold text-text-primary mb-1.5">
                   Subject / Summary *
                 </label>
                 <input
+                  id="ticket-subject-input"
                   type="text"
                   value={subject}
-                  onChange={(e) => setSubject(e.target.value)}
+                  onChange={(e) => {
+                    setSubject(e.target.value);
+                    if (formError) setFormError(null);
+                  }}
                   placeholder="e.g. Cannot access shared network drive from corporate laptop"
                   className="w-full px-3.5 py-2 text-xs border border-border rounded-lg bg-slate-50 focus:bg-white focus:outline-none focus:ring-2 focus:ring-brand-500"
                   required
@@ -167,13 +199,17 @@ export const CreateTicketPage: React.FC = () => {
               </div>
 
               <div>
-                <label className="block text-xs font-semibold text-text-primary mb-1.5">
+                <label htmlFor="ticket-desc-input" className="block text-xs font-semibold text-text-primary mb-1.5">
                   Detailed Description *
                 </label>
                 <textarea
+                  id="ticket-desc-input"
                   rows={5}
                   value={description}
-                  onChange={(e) => setDescription(e.target.value)}
+                  onChange={(e) => {
+                    setDescription(e.target.value);
+                    if (formError) setFormError(null);
+                  }}
                   placeholder="Please describe the symptoms, any error messages displayed, and steps already attempted..."
                   className="w-full px-3.5 py-2 text-xs border border-border rounded-lg bg-slate-50 focus:bg-white focus:outline-none focus:ring-2 focus:ring-brand-500"
                   required
@@ -183,8 +219,8 @@ export const CreateTicketPage: React.FC = () => {
               <div className="pt-2 flex justify-end">
                 <button
                   type="button"
-                  onClick={() => subject && description ? setStep(2) : alert('Please provide a subject and description.')}
-                  className="px-5 py-2 bg-brand-600 hover:bg-brand-700 text-white rounded-lg text-xs font-semibold flex items-center gap-1.5 shadow-sm"
+                  onClick={handleStep1Next}
+                  className="px-5 py-2 bg-brand-600 hover:bg-brand-700 text-white rounded-lg text-xs font-semibold flex items-center gap-1.5 shadow-sm focus-visible:ring-2 focus-visible:ring-brand-500 transition-colors"
                 >
                   <span>Next: Category & Impact</span>
                   <ArrowRight className="w-3.5 h-3.5" />

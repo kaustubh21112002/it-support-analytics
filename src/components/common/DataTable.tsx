@@ -1,5 +1,5 @@
-import React, { useState } from 'react';
-import { ChevronLeft, ChevronRight, ArrowUp, ArrowDown, ArrowUpDown, Inbox } from 'lucide-react';
+import React, { useState, useRef, useCallback, useEffect } from 'react';
+import { ChevronLeft, ChevronRight, ArrowUp, ArrowDown, ArrowUpDown, Inbox, RotateCcw } from 'lucide-react';
 
 export interface Column<T> {
   key: string;
@@ -18,6 +18,7 @@ interface DataTableProps<T> {
   emptyMessage?: string;
   loading?: boolean;
   onRowClick?: (row: T) => void;
+  onResetFilters?: () => void;
 }
 
 export function DataTable<T extends Record<string, any>>({
@@ -27,11 +28,49 @@ export function DataTable<T extends Record<string, any>>({
   pageSize = 10,
   emptyMessage = 'No records found matching the current filters.',
   loading = false,
-  onRowClick
+  onRowClick,
+  onResetFilters
 }: DataTableProps<T>) {
   const [currentPage, setCurrentPage] = useState(1);
   const [sortKey, setSortKey] = useState<string | null>(null);
   const [sortDir, setSortDir] = useState<'asc' | 'desc'>('asc');
+
+  const tableContainerRef = useRef<HTMLDivElement>(null);
+  const [canScrollRight, setCanScrollRight] = useState(false);
+
+  const checkScroll = useCallback(() => {
+    const el = tableContainerRef.current;
+    if (!el || loading || data.length === 0) {
+      setCanScrollRight(false);
+      return;
+    }
+    const hasOverflow = el.scrollWidth > el.clientWidth + 2;
+    const isAtEnd = el.scrollLeft + el.clientWidth >= el.scrollWidth - 4;
+    const shouldShow = hasOverflow && !isAtEnd;
+    setCanScrollRight((prev) => (prev !== shouldShow ? shouldShow : prev));
+  }, [loading, data.length]);
+
+  useEffect(() => {
+    checkScroll();
+
+    let resizeObserver: ResizeObserver | null = null;
+    const el = tableContainerRef.current;
+    if (el && typeof ResizeObserver !== 'undefined') {
+      resizeObserver = new ResizeObserver(() => {
+        checkScroll();
+      });
+      resizeObserver.observe(el);
+    }
+
+    const timer = setTimeout(checkScroll, 50);
+    window.addEventListener('resize', checkScroll);
+
+    return () => {
+      clearTimeout(timer);
+      if (resizeObserver) resizeObserver.disconnect();
+      window.removeEventListener('resize', checkScroll);
+    };
+  }, [checkScroll]);
 
   const handleSort = (key: string) => {
     if (sortKey === key) {
@@ -68,20 +107,30 @@ export function DataTable<T extends Record<string, any>>({
 
   return (
     <div className="bg-surface rounded-xl border border-border shadow-card overflow-hidden">
-      <div className="overflow-x-auto">
-        <table className="w-full text-left border-collapse text-xs">
-          <thead>
-            <tr className="bg-surface-subtle border-b border-border text-text-secondary font-semibold select-none">
-              {columns.map((col) => {
+      <div className="relative">
+        <div
+          ref={tableContainerRef}
+          onScroll={checkScroll}
+          className="overflow-x-auto"
+        >
+          <table className="w-full text-left border-collapse text-xs">
+            <thead>
+              <tr className="bg-surface-subtle border-b border-border text-text-secondary font-semibold select-none">
+              {columns.map((col, colIdx) => {
                 const isSorted = sortKey === col.key;
+                const isFirstCol = colIdx === 0;
                 const alignClass = col.align === 'right' ? 'text-right' : col.align === 'center' ? 'text-center' : 'text-left';
                 const justifyClass = col.align === 'right' ? 'justify-end' : col.align === 'center' ? 'justify-center' : 'justify-start';
+
+                const stickyClass = isFirstCol
+                  ? 'sticky left-0 z-20 bg-surface-subtle border-r border-border shadow-[2px_0_5px_-2px_rgba(15,23,42,0.08)]'
+                  : '';
 
                 return (
                   <th
                     key={col.key}
                     onClick={() => col.sortable && handleSort(col.key)}
-                    className={`py-3 px-4 ${alignClass} ${
+                    className={`py-2.5 sm:py-3 px-3 sm:px-4 ${alignClass} ${stickyClass} ${
                       col.sortable ? 'cursor-pointer hover:text-text-primary transition-colors' : ''
                     } ${col.className || ''}`}
                   >
@@ -109,15 +158,24 @@ export function DataTable<T extends Record<string, any>>({
           <tbody className="divide-y divide-border">
             {loading ? (
               // Loading Skeleton Rows
-              Array.from({ length: 5 }).map((_, rIdx) => (
-                <tr key={`skeleton-${rIdx}`} className="animate-pulse">
-                  {columns.map((col, cIdx) => (
-                    <td key={`sk-col-${cIdx}`} className="py-3.5 px-4">
-                      <div className="h-3.5 bg-slate-200 rounded w-3/4" />
-                    </td>
-                  ))}
-                </tr>
-              ))
+              Array.from({ length: 6 }).map((_, rIdx) => {
+                const widths = ['w-20', 'w-44', 'w-24', 'w-16', 'w-28'];
+                return (
+                  <tr key={`skeleton-${rIdx}`} className="animate-pulse motion-reduce:animate-none" role="status" aria-hidden="true">
+                    {columns.map((col, cIdx) => {
+                      const isFirstCol = cIdx === 0;
+                      const stickyClass = isFirstCol
+                        ? 'sticky left-0 z-10 bg-surface border-r border-border shadow-[2px_0_5px_-2px_rgba(15,23,42,0.08)]'
+                        : '';
+                      return (
+                        <td key={`sk-col-${cIdx}`} className={`py-2.5 sm:py-3.5 px-3 sm:px-4 ${stickyClass}`}>
+                          <div className={`h-3.5 bg-slate-200 rounded ${widths[cIdx % widths.length]}`} />
+                        </td>
+                      );
+                    })}
+                  </tr>
+                );
+              })
             ) : paginatedData.length === 0 ? (
               <tr>
                 <td colSpan={columns.length} className="py-14 text-center text-text-secondary">
@@ -127,6 +185,16 @@ export function DataTable<T extends Record<string, any>>({
                     </div>
                     <p className="text-xs font-semibold text-text-primary">{emptyMessage}</p>
                     <p className="text-[11px] text-slate-400">Try adjusting your filters or search keywords.</p>
+                    {onResetFilters && (
+                      <button
+                        type="button"
+                        onClick={onResetFilters}
+                        className="mt-2 inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold text-brand-700 bg-brand-50 hover:bg-brand-100 border border-brand-200 transition-colors shadow-xs focus-visible:ring-2 focus-visible:ring-brand-500"
+                      >
+                        <RotateCcw className="w-3.5 h-3.5 text-brand-600" />
+                        <span>Reset all filters</span>
+                      </button>
+                    )}
                   </div>
                 </td>
               </tr>
@@ -142,14 +210,19 @@ export function DataTable<T extends Record<string, any>>({
                       onRowClick(row);
                     }
                   }}
-                  className={`transition-colors hover:bg-slate-50/80 focus:bg-indigo-50/40 focus:outline-none ${
+                  className={`group transition-colors hover:bg-slate-50/80 focus:bg-indigo-50/40 focus:outline-none ${
                     onRowClick ? 'cursor-pointer' : ''
                   }`}
                 >
-                  {columns.map((col) => {
+                  {columns.map((col, colIdx) => {
+                    const isFirstCol = colIdx === 0;
                     const alignClass = col.align === 'right' ? 'text-right' : col.align === 'center' ? 'text-center' : 'text-left';
+                    const stickyClass = isFirstCol
+                      ? 'sticky left-0 z-10 bg-surface group-hover:bg-slate-50 group-focus:bg-indigo-50 border-r border-border shadow-[2px_0_5px_-2px_rgba(15,23,42,0.08)]'
+                      : '';
+
                     return (
-                      <td key={col.key} className={`py-3 px-4 text-text-primary ${alignClass} ${col.className || ''}`}>
+                      <td key={col.key} className={`py-2.5 sm:py-3 px-3 sm:px-4 text-text-primary ${alignClass} ${stickyClass} ${col.className || ''}`}>
                         {col.render ? col.render(row) : row[col.key]}
                       </td>
                     );
@@ -160,6 +233,15 @@ export function DataTable<T extends Record<string, any>>({
           </tbody>
         </table>
       </div>
+
+      {/* Subtle right-edge visual cue indicating horizontal overflow */}
+      {canScrollRight && (
+        <div
+          aria-hidden="true"
+          className="pointer-events-none absolute top-0 right-0 bottom-0 w-6 sm:w-8 bg-gradient-to-l from-slate-900/[0.07] via-slate-900/[0.02] to-transparent transition-opacity duration-200 z-10"
+        />
+      )}
+    </div>
 
       {!loading && sortedData.length > 0 && (
         <div className="flex flex-col sm:flex-row items-center justify-between px-4 py-3 border-t border-border bg-surface-subtle text-xs text-text-secondary gap-2">
@@ -173,7 +255,7 @@ export function DataTable<T extends Record<string, any>>({
               onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
               disabled={currentPage === 1}
               aria-label="Previous page"
-              className="p-1 rounded-md border border-border bg-surface hover:bg-slate-50 disabled:opacity-30 disabled:cursor-not-allowed transition-colors text-text-primary shadow-xs"
+              className="inline-flex items-center justify-center min-h-[36px] min-w-[36px] p-1.5 rounded-md border border-border bg-surface hover:bg-slate-50 disabled:opacity-30 disabled:cursor-not-allowed transition-colors text-text-primary shadow-xs"
             >
               <ChevronLeft className="w-4 h-4" />
             </button>
@@ -184,7 +266,7 @@ export function DataTable<T extends Record<string, any>>({
               onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
               disabled={currentPage === totalPages}
               aria-label="Next page"
-              className="p-1 rounded-md border border-border bg-surface hover:bg-slate-50 disabled:opacity-30 disabled:cursor-not-allowed transition-colors text-text-primary shadow-xs"
+              className="inline-flex items-center justify-center min-h-[36px] min-w-[36px] p-1.5 rounded-md border border-border bg-surface hover:bg-slate-50 disabled:opacity-30 disabled:cursor-not-allowed transition-colors text-text-primary shadow-xs"
             >
               <ChevronRight className="w-4 h-4" />
             </button>
