@@ -1,6 +1,7 @@
 import React from 'react';
 import { Link } from 'react-router-dom';
 import { isDemoAuthEnabled } from '../../config/permissions';
+import { dataService, useDataService } from '../../services/dataService';
 import {
   Headphones,
   ArrowRight,
@@ -19,6 +20,8 @@ import {
 } from 'lucide-react';
 
 export const LandingPage: React.FC = () => {
+  useDataService();
+  const metrics = dataService.getSummaryMetrics();
   const currentYear = new Date().getFullYear();
   const isDemoEnabled = isDemoAuthEnabled();
 
@@ -168,22 +171,22 @@ export const LandingPage: React.FC = () => {
                   </span>
                 </div>
 
-                {/* KPI Summaries derived directly from the synthetic dataset */}
+                {/* KPI Summaries derived directly from dataService */}
                 <div className="grid grid-cols-3 gap-3">
                   <div className="bg-slate-50/90 p-3 rounded-lg border border-slate-200/80">
                     <p className="text-[10px] uppercase font-bold text-slate-600">Total Volume</p>
-                    <p className="text-xl font-extrabold text-text-primary mt-0.5 tabular-nums">8,000</p>
+                    <p className="text-xl font-extrabold text-text-primary mt-0.5 tabular-nums">{metrics.totalTickets.toLocaleString()}</p>
                     <p className="text-[10px] text-text-secondary">Calendar Year 2024</p>
                   </div>
                   <div className="bg-slate-50/90 p-3 rounded-lg border border-slate-200/80">
                     <p className="text-[10px] uppercase font-bold text-slate-600">SLA Compliance</p>
-                    <p className="text-xl font-extrabold text-emerald-600 mt-0.5 tabular-nums">87.9%</p>
+                    <p className="text-xl font-extrabold text-emerald-600 mt-0.5 tabular-nums">{metrics.slaCompliancePct}%</p>
                     <p className="text-[10px] text-emerald-700 font-medium">Target: 85.0%</p>
                   </div>
                   <div className="bg-slate-50/90 p-3 rounded-lg border border-slate-200/80">
                     <p className="text-[10px] uppercase font-bold text-slate-600">Mean Turnaround</p>
-                    <p className="text-xl font-extrabold text-brand-600 mt-0.5 tabular-nums">14.9h</p>
-                    <p className="text-[10px] text-text-secondary">Median: 7.2h</p>
+                    <p className="text-xl font-extrabold text-brand-600 mt-0.5 tabular-nums">{metrics.avgResolutionHours}h</p>
+                    <p className="text-[10px] text-text-secondary">Median: {metrics.medianResolutionHours}h</p>
                   </div>
                 </div>
 
@@ -191,30 +194,30 @@ export const LandingPage: React.FC = () => {
                 <div className="space-y-3 p-3.5 bg-slate-50 rounded-xl border border-slate-200">
                   <div className="flex items-center justify-between text-xs font-medium">
                     <span className="text-text-primary font-semibold">Resolved Ticket SLA Performance</span>
-                    <span className="text-slate-600">6,612 Resolved (82.7%)</span>
+                    <span className="text-slate-600">{metrics.resolvedTickets.toLocaleString()} Resolved ({Math.round((metrics.resolvedTickets / metrics.totalTickets) * 1000) / 10}%)</span>
                   </div>
 
                   {/* Proportional SLA Breakdown Bar */}
-                  <div className="h-3 w-full bg-slate-200 rounded-full overflow-hidden flex" role="progressbar" aria-valuenow={87.9} aria-valuemin={0} aria-valuemax={100} aria-label="SLA Compliance Rate" aria-valuetext="87.9% compliant">
-                    <div className="bg-emerald-600 h-full" style={{ width: '87.9%' }} title="Met SLA: 5,812 tickets (87.9%)" />
-                    <div className="bg-rose-500 h-full" style={{ width: '12.1%' }} title="Breached SLA: 800 tickets (12.1%)" />
+                  <div className="h-3 w-full bg-slate-200 rounded-full overflow-hidden flex" role="progressbar" aria-valuenow={metrics.slaCompliancePct} aria-valuemin={0} aria-valuemax={100} aria-label="SLA Compliance Rate" aria-valuetext={`${metrics.slaCompliancePct}% compliant`}>
+                    <div className="bg-emerald-600 h-full" style={{ width: `${metrics.slaCompliancePct}%` }} title={`Met SLA: ${metrics.slaCompliantCount.toLocaleString()} tickets (${metrics.slaCompliancePct}%)`} />
+                    <div className="bg-rose-500 h-full" style={{ width: `${metrics.slaBreachPct}%` }} title={`Breached SLA: ${metrics.slaBreachedCount.toLocaleString()} tickets (${metrics.slaBreachPct}%)`} />
                   </div>
 
                   <div className="flex items-center justify-between text-[11px] pt-0.5">
                     <span className="flex items-center gap-1.5 text-emerald-800 font-semibold">
                       <span className="w-2 h-2 rounded-full bg-emerald-600" aria-hidden="true" />
-                      5,812 Met Target (87.9%)
+                      {metrics.slaCompliantCount.toLocaleString()} Met Target ({metrics.slaCompliancePct}%)
                     </span>
                     <span className="flex items-center gap-1.5 text-rose-700 font-semibold">
                       <span className="w-2 h-2 rounded-full bg-rose-500" aria-hidden="true" />
-                      800 Breached (12.1%)
+                      {metrics.slaBreachedCount.toLocaleString()} Breached ({metrics.slaBreachPct}%)
                     </span>
                   </div>
 
                   {/* Benchmark Target Indicator */}
                   <div className="pt-2 border-t border-slate-200/80 flex items-center justify-between text-[11px] text-slate-600">
                     <span>Performance vs Governed SLA Benchmark:</span>
-                    <span className="font-bold text-emerald-700">+2.9% above 85% SLA Target</span>
+                    <span className="font-bold text-emerald-700">+{Math.round((metrics.slaCompliancePct - 85.0) * 10) / 10}% above 85% SLA Target</span>
                   </div>
                 </div>
 
@@ -225,7 +228,7 @@ export const LandingPage: React.FC = () => {
                       <AlertTriangle className="w-3.5 h-3.5 text-amber-600" aria-hidden="true" />
                       Open Backlog SLA Exposure
                     </span>
-                    <span className="font-semibold text-amber-950 font-mono">1,388 Active Tickets</span>
+                    <span className="font-semibold text-amber-950 font-mono">{metrics.openTickets.toLocaleString()} Active Tickets</span>
                   </div>
                   <p className="text-[11px] text-amber-800 leading-snug">
                     18 critical and high-priority tickets are currently within 4 hours of target breach threshold, concentrated in identity access and network connectivity.
