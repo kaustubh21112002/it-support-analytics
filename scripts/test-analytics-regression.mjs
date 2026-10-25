@@ -515,8 +515,48 @@ async function runRegressionTests() {
 
     console.log('  -> PASS: Breached ranking, at-risk isolation, and compliant exclusion verified.\n');
 
+    // =========================================================================
+    // Test 7: Recurring Issues Analysis (Grouping, Filters, Longitudinal Trends)
+    // =========================================================================
+    console.log('Test 7: Recurring Issues Analysis (Grouping, Filters & Breakdowns)...');
+
+    const recurringAnalysis = norm.computeLiveRecurringIssuesAnalysis(
+      issuesFixture,
+      categories,
+      departments,
+      slaRules
+    );
+
+    assert.equal(recurringAnalysis.totalIncidents, issuesFixture.length);
+    assert.equal(recurringAnalysis.uniqueIssueCount, 4);
+    assert.equal(recurringAnalysis.highestVolumeIssue, 'Battery Failure');
+    assert.ok(recurringAnalysis.topTrendSeries.length === 12, 'Must yield 12 monthly trend buckets');
+
+    const batteryDetail = recurringAnalysis.issues.find(i => i.issue === 'Battery Failure');
+    assert.ok(batteryDetail, 'Battery Failure must be in issues register');
+    assert.equal(batteryDetail.frequency, 3);
+    assert.equal(batteryDetail.activeCount, 2);
+    assert.equal(batteryDetail.resolvedCount, 1);
+    assert.equal(batteryDetail.breachRatePct, 100.0);
+    assert.equal(batteryDetail.slaCompliancePct, 0.0);
+
+    // Filter check: Category 4 only (VPN Timeout)
+    const cat4Analysis = norm.computeLiveRecurringIssuesAnalysis(
+      issuesFixture,
+      categories,
+      departments,
+      slaRules,
+      { categoryId: 4 }
+    );
+    assert.equal(cat4Analysis.totalIncidents, 3);
+    assert.equal(cat4Analysis.issues.length, 1);
+    assert.equal(cat4Analysis.issues[0].issue, 'VPN Timeout');
+    assert.equal(cat4Analysis.issues[0].slaCompliancePct, 66.7); // 2 out of 3 compliant
+
+    console.log('  -> PASS: Recurring issue grouping, monthly trend series, and category filter verified.\n');
+
     console.log('===============================================================');
-    console.log(' ALL 6 ANALYTICS REGRESSION TEST SUITES PASSED PERFECTLY!');
+    console.log(' ALL 7 ANALYTICS REGRESSION TEST SUITES PASSED PERFECTLY!');
     console.log('===============================================================\n');
 
   } finally {

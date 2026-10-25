@@ -13,6 +13,8 @@ import {
   CategoryBreakdownItem,
   PriorityBreakdownItem,
   TopIssueItem,
+  RecurringIssueDetail,
+  RecurringIssuesAnalysis,
   DepartmentBreakdownItem,
   TeamBreakdownItem,
   KnowledgeArticle,
@@ -40,6 +42,7 @@ import {
   computeLiveMonthlyTrend,
   computeLiveResolutionDistribution,
   computeLiveTopIssues,
+  computeLiveRecurringIssuesAnalysis,
   computeLiveActionableExceptions,
   ActionableExceptionItem,
   ResolutionDistributionResult
@@ -875,6 +878,23 @@ class DataService {
       return computeLiveTopIssues(this.tickets, this.categories, this.slaRules, departmentId);
     }
     return seededData.topIssues as TopIssueItem[];
+  }
+
+  public getRecurringIssuesAnalysis(filters?: {
+    departmentId?: number;
+    categoryId?: number;
+    priority?: string;
+    startDate?: string;
+    endDate?: string;
+    limit?: number;
+  }): RecurringIssuesAnalysis {
+    return computeLiveRecurringIssuesAnalysis(
+      this.tickets,
+      this.categories,
+      this.departments,
+      this.slaRules,
+      filters
+    );
   }
 
   public getResolutionDistribution(departmentId?: number, priority?: string): ResolutionDistributionResult {

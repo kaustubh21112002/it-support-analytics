@@ -17,7 +17,12 @@ import {
   Download,
   CheckCircle2,
   Layers,
-  ArrowRight
+  ArrowRight,
+  Flame,
+  FolderOpen,
+  ExternalLink,
+  RefreshCw,
+  Filter
 } from 'lucide-react';
 import {
   LineChart,
@@ -335,88 +340,487 @@ export const DepartmentAnalysisPage: React.FC = () => {
 // 5. RecurringIssuesPage
 export const RecurringIssuesPage: React.FC = () => {
   useDataService();
+  const navigate = useNavigate();
+
+  // Filters
   const [departmentId, setDepartmentId] = useState<string>('All');
+  const [categoryId, setCategoryId] = useState<string>('All');
+  const [priority, setPriority] = useState<string>('All');
+  const [selectedIssueName, setSelectedIssueName] = useState<string | null>(null);
+
   const departments = dataService.getDepartments();
-  const topIssues = dataService.getTopIssues(departmentId !== 'All' ? Number(departmentId) : undefined);
+  const categories = dataService.getCategories();
+
+  // Governed Analysis Query
+  const analysis = React.useMemo(() => {
+    return dataService.getRecurringIssuesAnalysis({
+      departmentId: departmentId !== 'All' ? Number(departmentId) : undefined,
+      categoryId: categoryId !== 'All' ? Number(categoryId) : undefined,
+      priority: priority !== 'All' ? priority : undefined,
+      limit: 15
+    });
+  }, [departmentId, categoryId, priority]);
+
+  const selectedIssue = React.useMemo(() => {
+    if (!analysis.issues.length) return null;
+    if (selectedIssueName) {
+      const found = analysis.issues.find(i => i.issue === selectedIssueName);
+      if (found) return found;
+    }
+    return analysis.issues[0];
+  }, [analysis, selectedIssueName]);
+
+  const handleResetFilters = () => {
+    setDepartmentId('All');
+    setCategoryId('All');
+    setPriority('All');
+  };
+
+  const handleDrilldown = (issueType: string) => {
+    navigate(`/agent/tickets?search=${encodeURIComponent(issueType)}`);
+  };
+
+  const trendColors = ['#4F46E5', '#F59E0B', '#0F9F8F', '#EF4444', '#8B5CF6'];
 
   return (
     <div className="space-y-6">
       <PageHeader
         title="Recurring Issues Analysis"
-        subtitle="Ranked frequency of specific issue types to uncover automation targets and systemic failure points."
+        subtitle="Ranked Pareto frequency of specific incident types to uncover automation candidates, chronic defects, and systemic reliability risks."
         breadcrumbs={[
           { label: 'Analytics', path: '/analytics/overview' },
           { label: 'Recurring Issues' }
         ]}
       />
 
-      <FilterBar
-        departments={departments}
-        selectedDepartment={departmentId}
-        onDepartmentChange={setDepartmentId}
-        onReset={() => setDepartmentId('All')}
-      />
+      {/* Filter Control Bar */}
+      <div className="bg-surface rounded-xl border border-border shadow-card p-4">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+          <div className="flex flex-wrap items-center gap-3">
+            <div className="flex items-center gap-1.5 text-xs font-semibold text-text-secondary">
+              <Filter className="w-3.5 h-3.5 text-brand-600" />
+              <span>Filters:</span>
+            </div>
 
-      <ChartCard
-        title="Top Ranked Issue Types by Frequency"
-        subtitle="Governed Seeded Baseline · 2024 Pareto recurring issue frequency register"
-        takeaway={
-          topIssues.length > 0
-            ? `Top recurring issue is "${topIssues[0].issue}" (${topIssues[0].frequency} incidents), followed by "${topIssues[1]?.issue || ''}".`
-            : 'No recurring incidents recorded for the selected filter.'
-        }
-        height="h-64"
-      >
-        <ResponsiveContainer width="100%" height="100%">
-          <BarChart data={topIssues} margin={{ top: 10, right: 20, left: 0, bottom: 0 }}>
-            <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#E2E8F0" />
-            <XAxis dataKey="issue" stroke="#64748B" fontSize={10} interval={0} angle={-25} textAnchor="end" height={60} />
-            <YAxis stroke="#64748B" fontSize={11} />
-            <Tooltip
-              formatter={(val: number) => [`${val} occurrences`, 'Frequency']}
-              contentStyle={{ borderRadius: '8px', fontSize: '12px' }}
-            />
-            <Bar dataKey="frequency" fill="#F59E0B" radius={[4, 4, 0, 0]} />
-          </BarChart>
-        </ResponsiveContainer>
-      </ChartCard>
+            {/* Department Filter */}
+            <select
+              aria-label="Filter by department"
+              value={departmentId}
+              onChange={(e) => setDepartmentId(e.target.value)}
+              className="bg-slate-50 border border-border text-xs rounded-lg px-2.5 py-1.5 font-medium text-text-primary focus:outline-none focus:ring-2 focus:ring-brand-500"
+            >
+              <option value="All">All Departments</option>
+              {departments.map((d) => (
+                <option key={d.department_id} value={d.department_id}>
+                  {d.department_name}
+                </option>
+              ))}
+            </select>
 
-      <div className="bg-surface rounded-xl border border-border shadow-card p-5">
-        <h3 className="font-bold text-sm text-text-primary mb-1">Top 10 Recurring Incident Breakdown</h3>
-        <p className="text-xs text-text-secondary mb-3">Longitudinal incident frequency and impact tiering across the dataset</p>
-        <div className="overflow-x-auto">
-          <table className="w-full text-left border-collapse text-xs">
-            <thead>
-              <tr className="bg-slate-50 border-b border-border text-slate-500 font-semibold">
-                <th className="py-2.5 px-3">Issue Type</th>
-                <th className="py-2.5 px-3">Category</th>
-                <th className="py-2.5 px-3">Frequency</th>
-                <th className="py-2.5 px-3">Avg Resolution</th>
-                <th className="py-2.5 px-3">Breach Rate</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-border">
-              {topIssues.length === 0 ? (
-                <tr>
-                  <td colSpan={5} className="py-8 text-center text-slate-400">
-                    No recurring incidents recorded for the selected department.
-                  </td>
-                </tr>
-              ) : (
-                topIssues.map((issue, idx) => (
-                  <tr key={idx} className="hover:bg-slate-50/70">
-                    <td className="py-3 px-3 font-semibold text-text-primary">{issue.issue}</td>
-                    <td className="py-3 px-3 text-text-secondary">{issue.category}</td>
-                    <td className="py-3 px-3 font-bold text-brand-600">{issue.frequency}</td>
-                    <td className="py-3 px-3 text-text-secondary">{issue.avgResolutionHours}h</td>
-                    <td className="py-3 px-3 font-semibold text-red-600">{issue.breachRatePct}%</td>
-                  </tr>
-                ))
-              )}
-            </tbody>
-          </table>
+            {/* Category Filter */}
+            <select
+              aria-label="Filter by category"
+              value={categoryId}
+              onChange={(e) => setCategoryId(e.target.value)}
+              className="bg-slate-50 border border-border text-xs rounded-lg px-2.5 py-1.5 font-medium text-text-primary focus:outline-none focus:ring-2 focus:ring-brand-500"
+            >
+              <option value="All">All Categories</option>
+              {categories.map((c) => (
+                <option key={c.category_id} value={c.category_id}>
+                  {c.category_name}
+                </option>
+              ))}
+            </select>
+
+            {/* Priority Filter */}
+            <select
+              aria-label="Filter by priority"
+              value={priority}
+              onChange={(e) => setPriority(e.target.value)}
+              className="bg-slate-50 border border-border text-xs rounded-lg px-2.5 py-1.5 font-medium text-text-primary focus:outline-none focus:ring-2 focus:ring-brand-500"
+            >
+              <option value="All">All Priorities</option>
+              <option value="Critical">Critical</option>
+              <option value="High">High</option>
+              <option value="Medium">Medium</option>
+              <option value="Low">Low</option>
+            </select>
+          </div>
+
+          <button
+            onClick={handleResetFilters}
+            className="inline-flex items-center gap-1.5 text-xs font-semibold text-brand-600 hover:text-brand-700 transition-colors self-start sm:self-auto"
+          >
+            <RefreshCw className="w-3.5 h-3.5" />
+            <span>Reset Filters</span>
+          </button>
         </div>
       </div>
+
+      {/* KPI Overview Cards */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+        <KpiCard
+          title="Total Filtered Incidents"
+          value={analysis.totalIncidents.toLocaleString()}
+          subtitle={`${analysis.uniqueIssueCount} distinct issue clusters`}
+          icon={Layers}
+          variant="brand"
+        />
+        <KpiCard
+          title="Highest Volume Cluster"
+          value={analysis.highestVolumeIssue}
+          subtitle={
+            analysis.issues[0]
+              ? `${analysis.issues[0].frequency} tickets (${((analysis.issues[0].frequency / Math.max(1, analysis.totalIncidents)) * 100).toFixed(1)}% of volume)`
+              : 'No incidents recorded'
+          }
+          icon={Flame}
+          variant="warning"
+        />
+        <KpiCard
+          title="Most Impacted Category"
+          value={analysis.mostImpactedCategory}
+          subtitle="Primary technical domain"
+          icon={TrendingUp}
+          variant="neutral"
+        />
+        <KpiCard
+          title="Highest Breach Cluster"
+          value={analysis.highestBreachIssue}
+          subtitle="SLA non-compliance risk tier"
+          icon={AlertTriangle}
+          variant="critical"
+        />
+      </div>
+
+      {analysis.issues.length === 0 ? (
+        <div className="bg-surface rounded-xl border border-border p-12 text-center space-y-3">
+          <div className="w-12 h-12 bg-slate-100 rounded-full flex items-center justify-center mx-auto text-slate-400">
+            <FolderOpen className="w-6 h-6" />
+          </div>
+          <h3 className="text-sm font-bold text-text-primary">No Recurring Issues Found</h3>
+          <p className="text-xs text-text-secondary max-w-sm mx-auto">
+            No incidents matched the selected department, category, or priority criteria. Try resetting filters.
+          </p>
+          <button
+            onClick={handleResetFilters}
+            className="px-4 py-2 bg-brand-600 hover:bg-brand-700 text-white text-xs font-semibold rounded-lg shadow-sm"
+          >
+            Reset Filters
+          </button>
+        </div>
+      ) : (
+        <>
+          {/* Main Chart Section: Ranked Pareto & Trends Over Time */}
+          <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
+            {/* Top Issues Frequency Bar Chart (7 cols) */}
+            <div className="lg:col-span-7">
+              <ChartCard
+                title="Top Ranked Issue Types by Frequency"
+                subtitle="Governed Seeded Baseline · 2024 Pareto recurring issue frequency register"
+                takeaway={
+                  analysis.issues.length > 0
+                    ? `Observed: Top recurring issue is "${analysis.issues[0].issue}" with ${analysis.issues[0].frequency} incidents, followed by "${analysis.issues[1]?.issue || ''}".`
+                    : 'No recurring incidents recorded.'
+                }
+                height="h-72"
+              >
+                <ResponsiveContainer width="100%" height="100%">
+                  <BarChart data={analysis.issues.slice(0, 8)} margin={{ top: 10, right: 20, left: 0, bottom: 25 }}>
+                    <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#E2E8F0" />
+                    <XAxis
+                      dataKey="issue"
+                      stroke="#64748B"
+                      fontSize={10}
+                      interval={0}
+                      angle={-25}
+                      textAnchor="end"
+                      height={60}
+                    />
+                    <YAxis stroke="#64748B" fontSize={11} />
+                    <Tooltip
+                      formatter={(val: number) => [`${val} occurrences`, 'Frequency']}
+                      contentStyle={{ borderRadius: '8px', fontSize: '12px' }}
+                    />
+                    <Bar dataKey="frequency" fill="#F59E0B" radius={[4, 4, 0, 0]} />
+                  </BarChart>
+                </ResponsiveContainer>
+              </ChartCard>
+            </div>
+
+            {/* Trends Over Time Line Chart (5 cols) */}
+            <div className="lg:col-span-5">
+              <ChartCard
+                title="Longitudinal Trends (Top Issues)"
+                subtitle="Monthly incidence trajectory across 2024 calendar year"
+                takeaway="Monthly longitudinal observation: volume remains steady across quarters with no sudden single-month cluster spike."
+                height="h-72"
+              >
+                <ResponsiveContainer width="100%" height="100%">
+                  <LineChart data={analysis.topTrendSeries} margin={{ top: 10, right: 15, left: -15, bottom: 0 }}>
+                    <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#E2E8F0" />
+                    <XAxis dataKey="month" stroke="#64748B" fontSize={11} />
+                    <YAxis stroke="#64748B" fontSize={11} />
+                    <Tooltip contentStyle={{ borderRadius: '8px', fontSize: '12px' }} />
+                    <Legend wrapperStyle={{ fontSize: '10px', paddingTop: '4px' }} />
+                    {analysis.issues.slice(0, 4).map((iss, idx) => (
+                      <Line
+                        key={iss.issue}
+                        type="monotone"
+                        dataKey={iss.issue}
+                        stroke={trendColors[idx % trendColors.length]}
+                        strokeWidth={2}
+                        dot={{ r: 2 }}
+                        activeDot={{ r: 4 }}
+                      />
+                    ))}
+                  </LineChart>
+                </ResponsiveContainer>
+              </ChartCard>
+            </div>
+          </div>
+
+          {/* Detailed Ranked Table with Selection & Drill-Down */}
+          <div className="bg-surface rounded-xl border border-border shadow-card p-5">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 mb-4">
+              <div>
+                <h3 className="font-bold text-sm text-text-primary">Ranked Recurring Issue Register</h3>
+                <p className="text-xs text-text-secondary">
+                  Click any row to inspect priority mix, department concentration, and sample ticket records.
+                </p>
+              </div>
+              {selectedIssue && (
+                <button
+                  onClick={() => handleDrilldown(selectedIssue.issue)}
+                  className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-brand-50 hover:bg-brand-100 text-brand-700 border border-brand-200 text-xs font-semibold rounded-lg transition-colors"
+                >
+                  <span>Drill down to "{selectedIssue.issue}" tickets</span>
+                  <ExternalLink className="w-3.5 h-3.5" />
+                </button>
+              )}
+            </div>
+
+            <div className="overflow-x-auto">
+              <table className="w-full text-left border-collapse text-xs">
+                <thead>
+                  <tr className="bg-slate-50 border-b border-border text-slate-500 font-semibold">
+                    <th className="py-2.5 px-3">Rank & Issue Type</th>
+                    <th className="py-2.5 px-3">Category</th>
+                    <th className="py-2.5 px-3 text-right">Frequency</th>
+                    <th className="py-2.5 px-3 text-right">Active</th>
+                    <th className="py-2.5 px-3 text-right">Avg Resolution</th>
+                    <th className="py-2.5 px-3 text-right">SLA Breach Rate</th>
+                    <th className="py-2.5 px-3 text-right">SLA Compliance</th>
+                    <th className="py-2.5 px-3 text-right">Action</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y border-border">
+                  {analysis.issues.map((issue, idx) => {
+                    const isSelected = selectedIssue?.issue === issue.issue;
+                    return (
+                      <tr
+                        key={issue.issue}
+                        onClick={() => setSelectedIssueName(issue.issue)}
+                        className={`cursor-pointer transition-colors ${
+                          isSelected ? 'bg-brand-50/60 font-medium' : 'hover:bg-slate-50/70'
+                        }`}
+                      >
+                        <td className="py-3 px-3 text-text-primary">
+                          <div className="flex items-center gap-2">
+                            <span className="font-mono text-[11px] font-bold text-slate-400 w-5">
+                              #{idx + 1}
+                            </span>
+                            <span className="font-semibold">{issue.issue}</span>
+                          </div>
+                        </td>
+                        <td className="py-3 px-3 text-text-secondary">{issue.category}</td>
+                        <td className="py-3 px-3 text-right font-bold text-brand-600">
+                          {issue.frequency.toLocaleString()}
+                        </td>
+                        <td className="py-3 px-3 text-right text-slate-600 font-medium">
+                          {issue.activeCount}
+                        </td>
+                        <td className="py-3 px-3 text-right text-text-secondary">
+                          {issue.avgResolutionHours}h
+                        </td>
+                        <td className="py-3 px-3 text-right">
+                          <span
+                            className={`font-semibold ${
+                              issue.breachRatePct > 13
+                                ? 'text-red-600'
+                                : issue.breachRatePct > 10
+                                ? 'text-amber-600'
+                                : 'text-emerald-600'
+                            }`}
+                          >
+                            {issue.breachRatePct}%
+                          </span>
+                        </td>
+                        <td className="py-3 px-3 text-right font-semibold text-text-primary">
+                          {issue.slaCompliancePct}%
+                        </td>
+                        <td className="py-3 px-3 text-right">
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleDrilldown(issue.issue);
+                            }}
+                            className="inline-flex items-center gap-1 text-[11px] text-brand-600 hover:text-brand-800 font-semibold hover:underline"
+                          >
+                            <span>Tickets</span>
+                            <ArrowRight className="w-3 h-3" />
+                          </button>
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+          </div>
+
+          {/* Drilldown Drawer / Inspection Panel for Selected Issue */}
+          {selectedIssue && (
+            <div className="bg-surface rounded-xl border border-brand-200 shadow-card p-5 space-y-4">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between pb-3 border-b border-border gap-2">
+                <div className="flex items-center gap-2">
+                  <div className="p-1.5 bg-brand-50 rounded-lg text-brand-600">
+                    <Layers className="w-4 h-4" />
+                  </div>
+                  <div>
+                    <span className="text-[10px] font-bold tracking-wider uppercase text-brand-700">
+                      Cluster Breakdown & Diagnostics
+                    </span>
+                    <h4 className="text-base font-bold text-text-primary">{selectedIssue.issue}</h4>
+                  </div>
+                </div>
+
+                <div className="flex items-center gap-3">
+                  <span className="text-xs text-text-secondary">
+                    Total Volume: <strong className="text-brand-600">{selectedIssue.frequency}</strong>
+                  </span>
+                  <span className="text-xs text-text-secondary">
+                    SLA Compliance: <strong className="text-emerald-600">{selectedIssue.slaCompliancePct}%</strong>
+                  </span>
+                  <button
+                    onClick={() => handleDrilldown(selectedIssue.issue)}
+                    className="px-3 py-1.5 bg-brand-600 hover:bg-brand-700 text-white rounded-lg text-xs font-semibold shadow-sm transition-colors inline-flex items-center gap-1"
+                  >
+                    <span>Inspect In Ticket Queue</span>
+                    <ArrowRight className="w-3.5 h-3.5" />
+                  </button>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-xs">
+                {/* Priority Breakdown */}
+                <div className="bg-slate-50 rounded-lg p-3 border border-slate-200">
+                  <span className="font-bold text-slate-700 block mb-2">Priority Tiering</span>
+                  <div className="space-y-1.5">
+                    <div className="flex justify-between items-center">
+                      <PriorityBadge priority="Critical" />
+                      <span className="font-semibold text-slate-800">
+                        {selectedIssue.priorityBreakdown.Critical}
+                      </span>
+                    </div>
+                    <div className="flex justify-between items-center">
+                      <PriorityBadge priority="High" />
+                      <span className="font-semibold text-slate-800">
+                        {selectedIssue.priorityBreakdown.High}
+                      </span>
+                    </div>
+                    <div className="flex justify-between items-center">
+                      <PriorityBadge priority="Medium" />
+                      <span className="font-semibold text-slate-800">
+                        {selectedIssue.priorityBreakdown.Medium}
+                      </span>
+                    </div>
+                    <div className="flex justify-between items-center">
+                      <PriorityBadge priority="Low" />
+                      <span className="font-semibold text-slate-800">
+                        {selectedIssue.priorityBreakdown.Low}
+                      </span>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Department Concentration */}
+                <div className="bg-slate-50 rounded-lg p-3 border border-slate-200">
+                  <span className="font-bold text-slate-700 block mb-2">Department Concentration</span>
+                  <div className="space-y-1 max-h-28 overflow-y-auto pr-1">
+                    {selectedIssue.departmentBreakdown.map((dept) => (
+                      <div key={dept.departmentId} className="flex justify-between items-center py-0.5">
+                        <span className="text-slate-600 truncate max-w-[150px]">{dept.departmentName}</span>
+                        <span className="font-bold text-brand-700 bg-white px-1.5 py-0.5 rounded border border-slate-200 text-[11px]">
+                          {dept.count}
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Sample Tickets & Quick Access */}
+                <div className="bg-slate-50 rounded-lg p-3 border border-slate-200">
+                  <span className="font-bold text-slate-700 block mb-2">Sample Tickets In Cluster</span>
+                  <div className="flex flex-wrap gap-1.5">
+                    {selectedIssue.sampleTicketIds.map((tid) => (
+                      <button
+                        key={tid}
+                        onClick={() => navigate(`/agent/tickets/${tid}`)}
+                        className="px-2 py-1 bg-white hover:bg-brand-50 border border-slate-200 hover:border-brand-300 rounded text-[11px] font-mono font-semibold text-brand-700 transition-colors"
+                      >
+                        {tid}
+                      </button>
+                    ))}
+                  </div>
+                  <p className="text-[11px] text-slate-500 mt-2">
+                    Click any ID above to inspect the specific triage log, assigned agent, and resolution timestamps.
+                  </p>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* Evidence-Based Analytical Takeaways */}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div className="bg-surface rounded-xl border border-border p-4 space-y-2">
+              <div className="flex items-center gap-2 text-brand-700">
+                <CheckCircle2 className="w-4 h-4" />
+                <h4 className="text-xs font-bold uppercase tracking-wider">Observed Empirical Patterns</h4>
+              </div>
+              <ul className="text-xs text-text-secondary space-y-1.5 list-disc list-inside">
+                <li>
+                  <strong>Top 10 clustering:</strong> The top 10 recurring issue types account for substantial repeat support load, with each individual top issue recording between 270 and 305 incidents across 2024.
+                </li>
+                <li>
+                  <strong>SLA variation:</strong> Incident turnaround times for top recurring issues range from 13.8 to 16.7 hours, with breach rates between 10.4% and 15.2%.
+                </li>
+                <li>
+                  <strong>Cross-departmental distribution:</strong> Hardware and Network issues demonstrate consistent repeat patterns across both Operations and Engineering departments.
+                </li>
+              </ul>
+            </div>
+
+            <div className="bg-surface rounded-xl border border-amber-200 bg-amber-50/20 p-4 space-y-2">
+              <div className="flex items-center gap-2 text-amber-700">
+                <AlertTriangle className="w-4 h-4" />
+                <h4 className="text-xs font-bold uppercase tracking-wider">Areas Requiring Investigation</h4>
+              </div>
+              <ul className="text-xs text-text-secondary space-y-1.5 list-disc list-inside">
+                <li>
+                  <strong>Self-service automation candidates:</strong> VPN connection renegotiation loops and battery health warnings are high-volume candidates for automated diagnostic scripts.
+                </li>
+                <li>
+                  <strong>Correlation vs Causality:</strong> Elevated turnaround on Kubernetes crashloops is associated with higher technical complexity, requiring team-level root-cause analysis before concluding agent deficit.
+                </li>
+                <li>
+                  <strong>Policy alignment:</strong> Sub-15% breach rate issues remain within governing SLA bands but contribute heavily to cumulative queue congestion.
+                </li>
+              </ul>
+            </div>
+          </div>
+        </>
+      )}
     </div>
   );
 };

@@ -14,7 +14,9 @@ import {
   PriorityBreakdownItem,
   TeamBreakdownItem,
   MonthlyTrendItem,
-  TopIssueItem
+  TopIssueItem,
+  RecurringIssueDetail,
+  RecurringIssuesAnalysis
 } from '../types';
 
 export class NormalizationError extends Error {
@@ -863,6 +865,229 @@ export function computeLiveTopIssues(
       avgResolutionHours: item.resolvedCount > 0 ? Math.round((item.totalHours / item.resolvedCount) * 10) / 10 : 0,
       breachRatePct: item.resolvedCount > 0 ? Math.round((item.breachedCount / item.resolvedCount) * 1000) / 10 : 0
     }));
+}
+
+export function computeLiveRecurringIssuesAnalysis(
+  tickets: Ticket[],
+  categories: Category[],
+  departments: Department[],
+  slaRules: SlaRule[],
+  filters?: {
+    departmentId?: number;
+    categoryId?: number;
+    priority?: string;
+    startDate?: string;
+    endDate?: string;
+    limit?: number;
+  }
+): RecurringIssuesAnalysis {
+  let filtered = tickets;
+
+  if (filters?.departmentId) {
+    filtered = filtered.filter(t => t.department_id === filters.departmentId);
+  }
+  if (filters?.categoryId) {
+    filtered = filtered.filter(t => t.category_id === filters.categoryId);
+  }
+  if (filters?.priority && filters.priority !== 'All') {
+    filtered = filtered.filter(t => t.priority.toLowerCase() === filters.priority!.toLowerCase());
+  }
+  if (filters?.startDate) {
+    const start = new Date(filters.startDate).getTime();
+    if (!isNaN(start)) {
+      filtered = filtered.filter(t => new Date(t.created_at).getTime() >= start);
+    }
+  }
+  if (filters?.endDate) {
+    const end = new Date(filters.endDate).getTime();
+    if (!isNaN(end)) {
+      filtered = filtered.filter(t => new Date(t.created_at).getTime() <= end);
+    }
+  }
+
+  const catMap = new Map(categories.map(c => [c.category_id, c.category_name]));
+  const deptMap = new Map(departments.map(d => [d.department_id, d.department_name]));
+  const slaMap = new Map(slaRules.map(r => [r.sla_rule_id, r.target_resolution_hours]));
+
+  const monthNames = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+  const monthKeys = monthNames.map((m, idx) => ({
+    month: m,
+    fullMonth: `2024-${String(idx + 1).padStart(2, '0')}`
+  }));
+
+  const issueStats: Record<string, {
+    issue: string;
+    category: string;
+    frequency: number;
+    totalHours: number;
+    resolvedCount: number;
+    breachedCount: number;
+    compliantCount: number;
+    activeCount: number;
+    priorities: { Critical: number; High: number; Medium: number; Low: number };
+    deptCounts: Record<number, number>;
+    monthCounts: Record<string, number>;
+    sampleTicketIds: string[];
+  }> = {};
+
+  for (let i = 0; i < filtered.length; i++) {
+    const t = filtered[i];
+    const issue = t.issue_type;
+
+    if (!issueStats[issue]) {
+      issueStats[issue] = {
+        issue,
+        category: catMap.get(t.category_id) || 'General',
+        frequency: 0,
+        totalHours: 0,
+        resolvedCount: 0,
+        breachedCount: 0,
+        compliantCount: 0,
+        activeCount: 0,
+        priorities: { Critical: 0, High: 0, Medium: 0, Low: 0 },
+        deptCounts: {},
+        monthCounts: {},
+        sampleTicketIds: []
+      };
+    }
+
+    const stat = issueStats[issue];
+    stat.frequency++;
+
+    if (t.priority in stat.priorities) {
+      stat.priorities[t.priority as keyof typeof stat.priorities]++;
+    }
+
+    stat.deptCounts[t.department_id] = (stat.deptCounts[t.department_id] || 0) + 1;
+
+    // Monthly bucket
+    const createdDate = new Date(t.created_at);
+    if (!isNaN(createdDate.getTime())) {
+      const monthIdx = createdDate.getUTCMonth();
+      if (monthIdx >= 0 && monthIdx < 12) {
+        const fullM = `2024-${String(monthIdx + 1).padStart(2, '0')}`;
+        stat.monthCounts[fullM] = (stat.monthCounts[fullM] || 0) + 1;
+      }
+    }
+
+    if (stat.sampleTicketIds.length < 5) {
+      stat.sampleTicketIds.push(t.ticket_id);
+    }
+
+    if (t.status === 'Resolved' || t.status === 'Closed') {
+      stat.resolvedCount++;
+      if (t.resolution_time_hours !== null && !isNaN(t.resolution_time_hours)) {
+        stat.totalHours += t.resolution_time_hours;
+        const target = slaMap.get(t.sla_rule_id) || 24;
+        if (t.resolution_time_hours > target) {
+          stat.breachedCount++;
+        } else {
+          stat.compliantCount++;
+        }
+      }
+    } else {
+      stat.activeCount++;
+    }
+  }
+
+  const sortedIssues = Object.values(issueStats)
+    .sort((a, b) => {
+      if (b.frequency !== a.frequency) {
+        return b.frequency - a.frequency;
+      }
+      return a.issue.localeCompare(b.issue);
+    });
+
+  const limit = filters?.limit || 15;
+  const slicedIssues = sortedIssues.slice(0, limit);
+
+  const issueDetails: RecurringIssueDetail[] = slicedIssues.map(item => {
+    const deptBreakdown = Object.entries(item.deptCounts).map(([deptIdStr, count]) => {
+      const deptId = Number(deptIdStr);
+      return {
+        departmentId: deptId,
+        departmentName: deptMap.get(deptId) || `Department ${deptId}`,
+        count
+      };
+    }).sort((a, b) => b.count - a.count);
+
+    const monthlyTrend = monthKeys.map(mk => ({
+      month: mk.month,
+      fullMonth: mk.fullMonth,
+      count: item.monthCounts[mk.fullMonth] || 0
+    }));
+
+    const resolvedWithHours = item.resolvedCount;
+    const avgResolutionHours = resolvedWithHours > 0
+      ? Math.round((item.totalHours / resolvedWithHours) * 10) / 10
+      : 0;
+
+    const breachRatePct = resolvedWithHours > 0
+      ? Math.round((item.breachedCount / resolvedWithHours) * 1000) / 10
+      : 0;
+
+    const slaCompliancePct = resolvedWithHours > 0
+      ? Math.round((item.compliantCount / resolvedWithHours) * 1000) / 10
+      : 0;
+
+    return {
+      issue: item.issue,
+      category: item.category,
+      frequency: item.frequency,
+      avgResolutionHours,
+      breachRatePct,
+      slaCompliancePct,
+      activeCount: item.activeCount,
+      resolvedCount: item.resolvedCount,
+      priorityBreakdown: item.priorities,
+      departmentBreakdown: deptBreakdown,
+      monthlyTrend,
+      sampleTicketIds: item.sampleTicketIds
+    };
+  });
+
+  // Top 5 issues monthly trend series for chart
+  const top5 = issueDetails.slice(0, 5);
+  const topTrendSeries = monthKeys.map(mk => {
+    const entry: { month: string; [issueName: string]: string | number } = { month: mk.month };
+    top5.forEach(top => {
+      const monthData = top.monthlyTrend.find(m => m.fullMonth === mk.fullMonth);
+      entry[top.issue] = monthData ? monthData.count : 0;
+    });
+    return entry;
+  });
+
+  // Summary statistics
+  const totalIncidents = filtered.length;
+  const uniqueIssueCount = Object.keys(issueStats).length;
+  const highestVolumeIssue = sortedIssues[0]?.issue || 'None';
+
+  let highestBreach = 'None';
+  let maxBreachRate = -1;
+  issueDetails.forEach(iss => {
+    if (iss.breachRatePct > maxBreachRate && iss.resolvedCount >= 5) {
+      maxBreachRate = iss.breachRatePct;
+      highestBreach = `${iss.issue} (${iss.breachRatePct}%)`;
+    }
+  });
+
+  const categoryFrequency: Record<string, number> = {};
+  filtered.forEach(t => {
+    const cName = catMap.get(t.category_id) || 'General';
+    categoryFrequency[cName] = (categoryFrequency[cName] || 0) + 1;
+  });
+  const mostImpactedCategory = Object.entries(categoryFrequency)
+    .sort((a, b) => b[1] - a[1])[0]?.[0] || 'General';
+
+  return {
+    issues: issueDetails,
+    totalIncidents,
+    uniqueIssueCount,
+    highestVolumeIssue,
+    highestBreachIssue: highestBreach !== 'None' ? highestBreach : (sortedIssues[0] ? `${sortedIssues[0].issue}` : 'None'),
+    mostImpactedCategory,
+    topTrendSeries
+  };
 }
 
 export interface ActionableExceptionItem {

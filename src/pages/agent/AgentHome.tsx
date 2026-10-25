@@ -22,14 +22,37 @@ export const AgentHome: React.FC = () => {
   const { user } = useAuth();
   const navigate = useNavigate();
 
+  const agents = dataService.getAgents();
+  // Find current agent ID by user name or fallback to first active agent (Arjun Mehta)
+  const currentAgent = React.useMemo(() => {
+    if (user?.name) {
+      const match = agents.find(a => a.agent_name.toLowerCase().includes(user.name.toLowerCase()) || user.name.toLowerCase().includes(a.agent_name.toLowerCase()));
+      if (match) return match;
+    }
+    return agents[0] || null;
+  }, [agents, user]);
+
   const atRiskTickets = dataService.getAtRiskTickets();
-  const { tickets: myQueue } = dataService.getTickets({ limit: 6 });
   const metrics = dataService.getSummaryMetrics();
 
+  // Assigned tickets to current agent (or all active backlog for overview)
+  const { tickets: myAssignedTickets } = dataService.getTickets({
+    agentId: currentAgent ? currentAgent.agent_id : undefined,
+    status: 'active backlog',
+    limit: 10
+  });
+
+  const { tickets: unassignedTickets } = dataService.getTickets({
+    status: 'active backlog'
+  });
+  const unassignedCount = React.useMemo(() => {
+    return unassignedTickets.filter(t => t.agent_id === null).length;
+  }, [unassignedTickets]);
+
   const statusDonutData = [
-    { name: 'Open', value: 552, color: '#3B82F6' },
-    { name: 'In Progress', value: 523, color: '#F59E0B' },
-    { name: 'Pending', value: 313, color: '#8B5CF6' },
+    { name: 'Open', value: metrics.openBreakdown.open, color: '#3B82F6' },
+    { name: 'In Progress', value: metrics.openBreakdown.inProgress, color: '#F59E0B' },
+    { name: 'Pending', value: metrics.openBreakdown.pending, color: '#8B5CF6' },
     { name: 'Resolved', value: 4882, color: '#0F9F8F' },
     { name: 'Closed', value: 1730, color: '#94A3B8' }
   ];
@@ -38,11 +61,11 @@ export const AgentHome: React.FC = () => {
     <div className="space-y-6">
       <PageHeader
         title="Agent Dashboard"
-        subtitle="Operational triage queue, SLA countdowns, and active workload distribution."
+        subtitle={`Operational triage queue, SLA countdowns, and active workload distribution for ${currentAgent?.agent_name || 'Service Desk Specialist'}.`}
         actions={
           <Link
             to="/agent/tickets"
-            className="inline-flex items-center gap-2 px-4 py-2 bg-brand-600 hover:bg-brand-700 text-white rounded-lg text-xs font-semibold shadow-sm transition-all"
+            className="inline-flex items-center gap-2 px-4 py-2 bg-brand-600 hover:bg-brand-700 text-white rounded-lg text-xs font-semibold shadow-sm transition-all focus-visible:ring-2 focus-visible:ring-brand-500"
           >
             <Layers className="w-4 h-4" />
             <span>Open Global Queue</span>
@@ -54,14 +77,14 @@ export const AgentHome: React.FC = () => {
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
         <KpiCard
           title="Assigned to Me"
-          value="18"
-          subtitle="Currently active in queue"
+          value={String(myAssignedTickets.length)}
+          subtitle={`Active backlog for ${currentAgent?.agent_name?.split(' ')[0] || 'Agent'}`}
           icon={UserCheck}
           variant="brand"
         />
         <KpiCard
           title="Unassigned Queue"
-          value="12"
+          value={String(unassignedCount)}
           subtitle="Awaiting agent dispatch"
           icon={Inbox}
           variant="neutral"
@@ -74,9 +97,9 @@ export const AgentHome: React.FC = () => {
           variant="critical"
         />
         <KpiCard
-          title="Resolved This Week"
-          value="28"
-          subtitle="Compliant with targets"
+          title="Global Compliance"
+          value={`${metrics.slaCompliancePct}%`}
+          subtitle={`${metrics.slaCompliantCount.toLocaleString()} of ${metrics.resolvedTickets.toLocaleString()} resolved met SLA`}
           icon={CheckCircle2}
           variant="healthy"
         />
@@ -112,9 +135,10 @@ export const AgentHome: React.FC = () => {
                 </tr>
               </thead>
               <tbody className="divide-y divide-border">
-                {myQueue.slice(0, 5).map((t, idx) => {
-                  const hoursLeft = Math.max(1.2, 8 - (idx * 1.5));
-                  const isUrgent = hoursLeft < 3;
+                {myAssignedTickets.slice(0, 5).map((t) => {
+                  const targetHours = t.priority === 'Critical' ? 4 : t.priority === 'High' ? 8 : t.priority === 'Medium' ? 24 : 72;
+                  const hoursLeft = Math.max(0.8, Math.round((targetHours * 0.45) * 10) / 10);
+                  const isUrgent = hoursLeft < 3 || t.priority === 'Critical';
                   return (
                     <tr key={t.ticket_id} className="hover:bg-slate-50/70 transition-colors">
                       <td className="py-3 px-3 font-semibold text-brand-600">
@@ -130,7 +154,7 @@ export const AgentHome: React.FC = () => {
                       </td>
                       <td className="py-3 px-3">
                         <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded text-[11px] font-semibold ${
-                          isUrgent ? 'bg-red-50 text-red-700 border border-red-200 animate-pulse' : 'bg-slate-100 text-slate-700'
+                          isUrgent ? 'bg-red-50 text-red-700 border border-red-200' : 'bg-slate-100 text-slate-700'
                         }`}>
                           <Clock className="w-3 h-3" />
                           {hoursLeft.toFixed(1)}h
@@ -151,6 +175,13 @@ export const AgentHome: React.FC = () => {
                     </tr>
                   );
                 })}
+                {myAssignedTickets.length === 0 && (
+                  <tr>
+                    <td colSpan={6} className="py-8 text-center text-slate-400">
+                      No active tickets assigned to this agent in queue.
+                    </td>
+                  </tr>
+                )}
               </tbody>
             </table>
           </div>

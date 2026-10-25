@@ -24,11 +24,13 @@ import {
 
 export const PredictionsPage: React.FC = () => {
   useDataService();
-  const [tab, setTab] = useState<'predict' | 'performance' | 'importance'>('predict');
+  const [tab, setTab] = useState<'predict' | 'performance' | 'importance' | 'architecture'>('predict');
   const [categoryId, setCategoryId] = useState<number>(4);
   const [issueType, setIssueType] = useState('VPN Connection');
   const [priority, setPriority] = useState<TicketPriority>('High');
   const [departmentId, setDepartmentId] = useState<number>(4);
+  const [isEvaluating, setIsEvaluating] = useState<boolean>(false);
+  const [validationError, setValidationError] = useState<string | null>(null);
 
   const [predictionResult, setPredictionResult] = useState(() =>
     dataService.predictResolutionTime({
@@ -44,13 +46,28 @@ export const PredictionsPage: React.FC = () => {
 
   const handlePredict = (e: React.FormEvent) => {
     e.preventDefault();
-    const result = dataService.predictResolutionTime({
-      category_id: categoryId,
-      issue_type: issueType,
-      priority,
-      department_id: departmentId
-    });
-    setPredictionResult(result);
+    if (!issueType.trim()) {
+      setValidationError('Please enter a valid issue type description.');
+      return;
+    }
+    setValidationError(null);
+    setIsEvaluating(true);
+
+    setTimeout(() => {
+      try {
+        const result = dataService.predictResolutionTime({
+          category_id: categoryId,
+          issue_type: issueType.trim(),
+          priority,
+          department_id: departmentId
+        });
+        setPredictionResult(result);
+      } catch (err: any) {
+        setValidationError(err?.message || 'Error executing resolution prediction.');
+      } finally {
+        setIsEvaluating(false);
+      }
+    }, 250);
   };
 
   // Feature importance data
@@ -64,25 +81,32 @@ export const PredictionsPage: React.FC = () => {
   // Baseline vs ML Model Candidate benchmark table
   const modelComparison = [
     {
-      model: 'Baseline (Mean Predictor)',
-      mae: '11.80 hrs',
-      rmse: '15.42 hrs',
-      r2: '0.000',
-      description: 'Predicts constant dataset mean duration (14.9 hrs)'
+      model: 'Governed Baseline (Mean Predictor)',
+      mae: '13.53 hrs',
+      rmse: '25.68 hrs',
+      status: 'Empirical Historical Reference',
+      description: 'Predicts constant dataset mean turnaround duration (14.9 hrs) across 6,612 resolved tickets'
     },
     {
-      model: 'Ridge Linear Regression',
+      model: 'Priority Cohort Stratification',
+      mae: '9.70 hrs',
+      rmse: '19.92 hrs',
+      status: 'Rule-Based Grouping Baseline',
+      description: 'Stratifies by priority SLA tiers (Critical 2.2h, High 4.4h, Medium 12.7h, Low 39.1h)'
+    },
+    {
+      model: 'Ridge Linear Regression (Simulation)',
       mae: '6.12 hrs',
       rmse: '8.45 hrs',
-      r2: '0.521',
-      description: 'One-hot encoded category and priority features'
+      status: 'Experimental Candidate',
+      description: 'One-hot encoded category and priority features with L2 weight regularization'
     },
     {
-      model: 'LightGBM Gradient Boosting',
+      model: 'LightGBM Gradient Boosting (Simulation)',
       mae: '3.42 hrs',
       rmse: '5.18 hrs',
-      r2: '0.784',
-      description: 'Champion candidate with non-linear interaction trees'
+      status: 'Offline Study Benchmark',
+      description: 'Offline tree-based candidate with non-linear feature interaction depth'
     }
   ];
 
@@ -130,6 +154,16 @@ export const PredictionsPage: React.FC = () => {
         >
           Feature Importance
         </button>
+        <button
+          onClick={() => setTab('architecture')}
+          className={`pb-2.5 px-1 transition-all ${
+            tab === 'architecture'
+              ? 'border-b-2 border-brand-600 text-brand-600 font-bold'
+              : 'text-text-secondary hover:text-text-primary'
+          }`}
+        >
+          Production Model Integration Roadmap
+        </button>
       </div>
 
       {tab === 'predict' && (
@@ -143,6 +177,13 @@ export const PredictionsPage: React.FC = () => {
             <p className="text-xs text-text-secondary mb-5">
               Only features available at ticket creation time are eligible for input. Post-resolution variables are strictly excluded.
             </p>
+
+            {validationError && (
+              <div className="mb-4 p-3 bg-red-50 border border-red-200 text-red-700 text-xs rounded-lg flex items-center gap-2">
+                <AlertCircle className="w-4 h-4 flex-shrink-0" />
+                <span>{validationError}</span>
+              </div>
+            )}
 
             <form onSubmit={handlePredict} className="space-y-4">
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
@@ -170,7 +211,10 @@ export const PredictionsPage: React.FC = () => {
                   <input
                     type="text"
                     value={issueType}
-                    onChange={(e) => setIssueType(e.target.value)}
+                    onChange={(e) => {
+                      setIssueType(e.target.value);
+                      if (validationError) setValidationError(null);
+                    }}
                     placeholder="e.g. VPN Connection, Battery replacement"
                     className="w-full px-3 py-2 text-xs border border-border rounded-lg bg-slate-50 focus:bg-white focus:outline-none focus:ring-2 focus:ring-brand-500 font-medium"
                   />
@@ -215,10 +259,11 @@ export const PredictionsPage: React.FC = () => {
               <div className="pt-2">
                 <button
                   type="submit"
-                  className="w-full py-2.5 bg-brand-600 hover:bg-brand-700 text-white font-semibold rounded-lg text-xs shadow-sm flex items-center justify-center gap-2 transition-all"
+                  disabled={isEvaluating}
+                  className="w-full py-2.5 bg-brand-600 hover:bg-brand-700 disabled:bg-slate-400 text-white font-semibold rounded-lg text-xs shadow-sm flex items-center justify-center gap-2 transition-all cursor-pointer"
                 >
-                  <Sparkles className="w-4 h-4" />
-                  <span>Predict Resolution Time</span>
+                  <Sparkles className={`w-4 h-4 ${isEvaluating ? 'animate-spin' : ''}`} />
+                  <span>{isEvaluating ? 'Evaluating Features...' : 'Predict Resolution Time'}</span>
                 </button>
               </div>
             </form>
@@ -227,9 +272,9 @@ export const PredictionsPage: React.FC = () => {
           {/* Prediction Result Panel (Right 5 cols) */}
           <div className="lg:col-span-5 bg-surface rounded-xl border border-slate-200 shadow-xs p-6 space-y-5">
             <div className="flex items-center justify-between border-b border-border pb-3">
-              <span className="text-xs font-bold text-text-primary">Prediction Result (Demo)</span>
+              <span className="text-xs font-bold text-text-primary">Prediction Result (Experimental Baseline)</span>
               <span className="text-[10px] bg-amber-50 text-amber-900 border border-amber-200 font-semibold px-2 py-0.5 rounded">
-                Simulated LightGBM Heuristic (Experimental)
+                Governed Empirical Baseline
               </span>
             </div>
 
@@ -238,11 +283,17 @@ export const PredictionsPage: React.FC = () => {
                 Estimated Resolution Time
               </span>
               <div className="text-4xl font-black text-brand-600 tracking-tight flex items-center justify-center gap-1">
-                <span>{predictionResult.estimatedHours}</span>
-                <span className="text-xl font-bold text-text-secondary">hours</span>
+                {isEvaluating ? (
+                  <span className="text-2xl text-slate-400 font-normal py-2">Computing...</span>
+                ) : (
+                  <>
+                    <span>{predictionResult.estimatedHours}</span>
+                    <span className="text-xl font-bold text-text-secondary">hours</span>
+                  </>
+                )}
               </div>
               <p className="text-xs text-slate-500 mt-1">
-                Confidence Range: {predictionResult.confidenceLower}h – {predictionResult.confidenceUpper}h
+                Estimated Confidence Window: {predictionResult.confidenceLower}h – {predictionResult.confidenceUpper}h
               </p>
             </div>
 
@@ -266,7 +317,14 @@ export const PredictionsPage: React.FC = () => {
             <div className="p-3 rounded-lg bg-amber-50 border border-amber-200 text-[11px] text-amber-900 flex items-start gap-2">
               <Info className="w-3.5 h-3.5 text-amber-600 mt-0.5 flex-shrink-0" />
               <span>
-                <strong>Operational Boundary:</strong> This is a statistical estimation for resource forecasting. It does not replace operational SLA commitments or priority triage rules.
+                <strong>Empirical Baseline Notice:</strong> Predictions are generated from historical ticket duration medians across priority and category cohorts. This demonstration does not claim live ML model inference.
+              </span>
+            </div>
+
+            <div className="p-3 rounded-lg bg-slate-50 border border-slate-200 text-[11px] text-slate-700 flex items-start gap-2">
+              <Clock className="w-3.5 h-3.5 text-slate-500 mt-0.5 flex-shrink-0" />
+              <span>
+                <strong>Operational Boundary:</strong> This is an empirical cohort estimation for resource forecasting. It does not replace operational SLA commitments or priority triage dispatch rules.
               </span>
             </div>
           </div>
@@ -313,22 +371,30 @@ export const PredictionsPage: React.FC = () => {
                 <thead>
                   <tr className="bg-slate-50 border-b border-border text-slate-500 font-semibold">
                     <th className="py-2.5 px-3">Candidate Architecture</th>
-                    <th className="py-2.5 px-3">Mean Absolute Error (MAE)</th>
-                    <th className="py-2.5 px-3">Root Mean Square Error (RMSE)</th>
-                    <th className="py-2.5 px-3">R-Squared (R²)</th>
-                    <th className="py-2.5 px-3">Description</th>
+                    <th className="py-2.5 px-3">Status</th>
+                    <th className="py-2.5 px-3 text-right">MAE</th>
+                    <th className="py-2.5 px-3 text-right">RMSE</th>
+                    <th className="py-2.5 px-3">Evaluation Basis</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-border">
                   {modelComparison.map((m, idx) => (
-                    <tr key={idx} className={idx === 2 ? 'bg-indigo-50/40 font-semibold' : ''}>
-                      <td className="py-3 px-3 text-text-primary flex items-center gap-2">
-                        {idx === 2 && <CheckCircle2 className="w-3.5 h-3.5 text-brand-600" />}
+                    <tr key={idx} className={idx === 1 ? 'bg-brand-50/30' : ''}>
+                      <td className="py-3 px-3 text-text-primary font-semibold flex items-center gap-2">
+                        {idx === 1 && <CheckCircle2 className="w-3.5 h-3.5 text-brand-600" />}
                         {m.model}
                       </td>
-                      <td className="py-3 px-3 text-text-primary">{m.mae}</td>
-                      <td className="py-3 px-3 text-text-primary">{m.rmse}</td>
-                      <td className="py-3 px-3 text-brand-600 font-bold">{m.r2}</td>
+                      <td className="py-3 px-3">
+                        <span className={`px-2 py-0.5 rounded text-[10px] font-semibold ${
+                          m.status.includes('Historical') ? 'bg-slate-100 text-slate-700' :
+                          m.status.includes('Grouping') ? 'bg-brand-100 text-brand-800' :
+                          'bg-amber-100 text-amber-800'
+                        }`}>
+                          {m.status}
+                        </span>
+                      </td>
+                      <td className="py-3 px-3 text-right font-mono font-medium text-text-primary">{m.mae}</td>
+                      <td className="py-3 px-3 text-right font-mono text-slate-600">{m.rmse}</td>
                       <td className="py-3 px-3 text-text-secondary">{m.description}</td>
                     </tr>
                   ))}
@@ -342,10 +408,10 @@ export const PredictionsPage: React.FC = () => {
       {tab === 'importance' && (
         <div className="bg-surface rounded-xl border border-border shadow-card p-6">
           <h3 className="font-bold text-sm text-text-primary mb-1">
-            Feature Importance (LightGBM Gini Gain)
+            Feature Importance (Empirical Information Gain)
           </h3>
           <p className="text-xs text-text-secondary mb-6">
-            Relative contribution of ticket creation attributes in predicting resolution duration.
+            Relative contribution of ticket creation attributes in predicting resolution duration across historical tickets.
           </p>
 
           <div className="h-64">
@@ -365,6 +431,49 @@ export const PredictionsPage: React.FC = () => {
                 <Bar dataKey="importance" fill="#4F46E5" radius={[0, 4, 4, 0]} />
               </BarChart>
             </ResponsiveContainer>
+          </div>
+        </div>
+      )}
+
+      {tab === 'architecture' && (
+        <div className="bg-surface rounded-xl border border-border shadow-card p-6 space-y-6 text-xs">
+          <div>
+            <h3 className="font-bold text-sm text-text-primary mb-1">
+              Production Machine Learning Integration Blueprint
+            </h3>
+            <p className="text-text-secondary">
+              Architectural prerequisites, data contracts, and verification gates required before deploying live production inference.
+            </p>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div className="p-4 bg-slate-50 border border-slate-200 rounded-lg space-y-2">
+              <span className="font-bold text-text-primary block text-xs">1. Endpoint & Serving Contract</span>
+              <p className="text-text-secondary leading-relaxed text-[11px]">
+                Genuine ML inference requires an asynchronous microservice endpoint (e.g. FastAPI / Triton Inference Server on GCP Vertex AI or AWS SageMaker) exposing a <code className="bg-white px-1 py-0.5 rounded border border-slate-200">POST /api/v1/predict/resolution</code> contract accepting strictly verified creation-time features.
+              </p>
+            </div>
+
+            <div className="p-4 bg-slate-50 border border-slate-200 rounded-lg space-y-2">
+              <span className="font-bold text-text-primary block text-xs">2. Cold-Start & Offline Fallback</span>
+              <p className="text-text-secondary leading-relaxed text-[11px]">
+                In the event of network timeouts (&gt;250ms), missing API tokens, or unmapped category embeddings, the application must transparently fall back to the governed empirical baseline without crashing or presenting unverified synthetic numbers as live predictions.
+              </p>
+            </div>
+
+            <div className="p-4 bg-slate-50 border border-slate-200 rounded-lg space-y-2">
+              <span className="font-bold text-text-primary block text-xs">3. Feature Leakage Safeguards</span>
+              <p className="text-text-secondary leading-relaxed text-[11px]">
+                Features strictly forbidden during inference: <code className="text-red-700 bg-red-50 px-1 py-0.5 rounded">resolved_at</code>, <code className="text-red-700 bg-red-50 px-1 py-0.5 rounded">resolution_time_hours</code>, <code className="text-red-700 bg-red-50 px-1 py-0.5 rounded">satisfaction_rating</code>, <code className="text-red-700 bg-red-50 px-1 py-0.5 rounded">comments</code>. Any feature leakage disqualifies the candidate model from deployment.
+              </p>
+            </div>
+
+            <div className="p-4 bg-slate-50 border border-slate-200 rounded-lg space-y-2">
+              <span className="font-bold text-text-primary block text-xs">4. Continuous Drift Monitoring</span>
+              <p className="text-text-secondary leading-relaxed text-[11px]">
+                Prediction error distributions must be tracked against ground truth when tickets are resolved. Scheduled retrain jobs must be governed by change control (DQ-ML-01) with versioned model weights and audit logging.
+              </p>
+            </div>
           </div>
         </div>
       )}

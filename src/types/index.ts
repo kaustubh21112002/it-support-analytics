@@ -114,6 +114,42 @@ export interface TopIssueItem {
   breachRatePct: number;
 }
 
+export interface RecurringIssueDetail extends TopIssueItem {
+  priorityBreakdown: {
+    Critical: number;
+    High: number;
+    Medium: number;
+    Low: number;
+  };
+  departmentBreakdown: Array<{
+    departmentId: number;
+    departmentName: string;
+    count: number;
+  }>;
+  monthlyTrend: Array<{
+    month: string;
+    fullMonth: string;
+    count: number;
+  }>;
+  slaCompliancePct: number;
+  activeCount: number;
+  resolvedCount: number;
+  sampleTicketIds: string[];
+}
+
+export interface RecurringIssuesAnalysis {
+  issues: RecurringIssueDetail[];
+  totalIncidents: number;
+  uniqueIssueCount: number;
+  highestVolumeIssue: string;
+  highestBreachIssue: string;
+  mostImpactedCategory: string;
+  topTrendSeries: Array<{
+    month: string;
+    [issueName: string]: string | number;
+  }>;
+}
+
 export interface DepartmentBreakdownItem {
   departmentId: number;
   departmentName: string;
