@@ -25,6 +25,7 @@ import {
   ChevronRight,
   Headphones,
   UploadCloud,
+  UserCheck,
   X
 } from 'lucide-react';
 
@@ -239,6 +240,10 @@ export const Sidebar: React.FC<SidebarProps> = ({
                     <NavLink to="/admin/users" onClick={onNavigate} className={navItemClass} title="Users & Roles">
                       <Users2 className="w-4 h-4 flex-shrink-0" />
                       {!collapsed && <span>User Management</span>}
+                    </NavLink>
+                    <NavLink to="/admin/access-requests" onClick={onNavigate} className={navItemClass} title="Access Requests Queue">
+                      <UserCheck className="w-4 h-4 flex-shrink-0 text-emerald-600" />
+                      {!collapsed && <span>Access Requests</span>}
                     </NavLink>
                     <NavLink to="/admin/security" onClick={onNavigate} className={navItemClass} title="Security Settings">
                       <ShieldCheck className="w-4 h-4 flex-shrink-0" />

@@ -57,11 +57,8 @@ export const RequestAccessPage: React.FC = () => {
 
     setLoading(true);
 
-    // Simulate standard security token verification / dispatch latency
-    await new Promise((resolve) => setTimeout(resolve, 600));
-
     try {
-      const res = dataService.submitAccessRequest({
+      const res = await dataService.submitAccessRequest({
         fullName,
         workEmail,
         departmentId,
@@ -70,17 +67,17 @@ export const RequestAccessPage: React.FC = () => {
       });
 
       setLoading(false);
-      if (res.success) {
+      if (res.success && res.request) {
         setSubmittedRequest({
           id: res.request.id,
           notice: res.notice
         });
       } else {
-        setError('Failed to log access request. Please contact service desk directly.');
+        setError(res.error || 'Failed to record access request. Please contact the service desk directly.');
       }
     } catch {
       setLoading(false);
-      setError('An unexpected error occurred while logging your request.');
+      setError('An unexpected error occurred while processing your request. Your input has been preserved.');
     }
   };
 
@@ -143,7 +140,7 @@ export const RequestAccessPage: React.FC = () => {
                   {submittedRequest.notice}
                 </p>
                 <div className="pt-2 border-t border-slate-200 text-[10px] text-slate-500">
-                  Target Role: <strong className="uppercase text-slate-700">{requestedRole}</strong> · Review SLA: 1 business day
+                  Target Role: <strong className="uppercase text-slate-700">{requestedRole}</strong> · Review Policy: Triaged by Corporate IT administrators in the Access Management Queue
                 </div>
               </div>
 

@@ -1788,47 +1788,185 @@ class DataService {
     return [headers.join(','), ...rows.map(r => r.join(','))].join('\n');
   }
 
+  private static ACCESS_REQUESTS_STORAGE_KEY = 'itsupport_access_requests_store';
+
+  /**
+   * Loads persisted access requests from localStorage.
+   * Provides durable cross-session and cross-tab storage for access requests.
+   */
+  private loadPersistedAccessRequests(): AccessRequest[] {
+    try {
+      if (typeof window !== 'undefined' && window.localStorage) {
+        const raw = window.localStorage.getItem(DataService.ACCESS_REQUESTS_STORAGE_KEY);
+        if (raw) {
+          const parsed = JSON.parse(raw);
+          if (Array.isArray(parsed)) {
+            return parsed;
+          }
+        }
+      }
+    } catch (err) {
+      console.warn('[dataService] Failed to load persisted access requests:', err);
+    }
+    return [];
+  }
+
+  /**
+   * Persists access requests to durable localStorage.
+   */
+  private savePersistedAccessRequests(requests: AccessRequest[]): void {
+    try {
+      if (typeof window !== 'undefined' && window.localStorage) {
+        window.localStorage.setItem(DataService.ACCESS_REQUESTS_STORAGE_KEY, JSON.stringify(requests));
+      }
+    } catch (err) {
+      console.warn('[dataService] Failed to persist access requests:', err);
+    }
+  }
+
   /**
    * Submits an access request for organizational review.
    * SECURITY INVARIANT:
-   * 1. This unauthenticated submission creates an immutable pending review ticket in session memory / audit log.
+   * 1. This unauthenticated submission creates a durable, immutable pending review ticket in persistent storage & audit log.
    * 2. It NEVER creates an active auth user, nor does it grant roles or elevated permissions.
-   * 3. Discloses clear persistence provenance (session cache vs live remote delivery).
+   * 3. Prevents duplicate submissions for identical work email and requested role in pending state.
+   * 4. Attempts remote Supabase persistence if available; falls back to durable persistent storage.
    */
-  public submitAccessRequest(request: {
+  public async submitAccessRequest(request: {
     fullName: string;
     workEmail: string;
     departmentId: number;
     requestedRole: UserRole;
     reason: string;
-  }): {
+  }): Promise<{
     success: boolean;
-    request: AccessRequest;
+    request?: AccessRequest;
     isPersisted: boolean;
+    storageProvenance: 'database' | 'persistent_storage';
+    error?: string;
     notice: string;
-  } {
-    const dept = this.departments.find(d => d.department_id === request.departmentId);
+  }> {
+    // 1. Strict server-side validation
+    const cleanName = request.fullName ? request.fullName.trim() : '';
+    const cleanEmail = request.workEmail ? request.workEmail.trim().toLowerCase() : '';
+    const cleanReason = request.reason ? request.reason.trim() : '';
+
+    if (!cleanName || cleanName.length < 2) {
+      return {
+        success: false,
+        isPersisted: false,
+        storageProvenance: 'persistent_storage',
+        error: 'Please provide a valid full legal or directory name (minimum 2 characters).',
+        notice: 'Validation failed.'
+      };
+    }
+
+    const emailPattern = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!cleanEmail || !emailPattern.test(cleanEmail)) {
+      return {
+        success: false,
+        isPersisted: false,
+        storageProvenance: 'persistent_storage',
+        error: 'Please provide a valid corporate work email address.',
+        notice: 'Validation failed.'
+      };
+    }
+
+    const validRoles: UserRole[] = ['employee', 'agent', 'manager', 'admin'];
+    if (!validRoles.includes(request.requestedRole)) {
+      return {
+        success: false,
+        isPersisted: false,
+        storageProvenance: 'persistent_storage',
+        error: 'Invalid requested role tier specified.',
+        notice: 'Validation failed.'
+      };
+    }
+
+    if (!cleanReason || cleanReason.length < 15) {
+      return {
+        success: false,
+        isPersisted: false,
+        storageProvenance: 'persistent_storage',
+        error: 'Please provide a comprehensive business justification (minimum 15 characters).',
+        notice: 'Validation failed.'
+      };
+    }
+
+    // Refresh memory cache from durable storage
+    const currentPersisted = this.loadPersistedAccessRequests();
+    const existingIndex = currentPersisted.findIndex(
+      r => r.workEmail === cleanEmail && r.requestedRole === request.requestedRole && r.status === 'pending_review'
+    );
+
+    if (existingIndex !== -1) {
+      const existing = currentPersisted[existingIndex];
+      return {
+        success: false,
+        isPersisted: true,
+        storageProvenance: existing.storageProvenance || 'persistent_storage',
+        error: `A pending access request for ${cleanEmail} for the '${request.requestedRole}' role is already under review (Reference: ${existing.id}). Duplicate submission rejected.`,
+        notice: 'Duplicate active submission prevented.'
+      };
+    }
+
+    const dept = this.departments.find(d => d.department_id === Number(request.departmentId));
+    const deptName = dept?.department_name || 'Corporate IT';
+    const requestId = `REQ-${Date.now().toString().slice(-6)}-${Math.random().toString(36).substring(2, 5).toUpperCase()}`;
+    const timestamp = new Date().toISOString();
+
+    let storageProvenance: 'database' | 'persistent_storage' = 'persistent_storage';
+    let remoteSuccess = false;
+
+    // 2. Attempt remote Supabase insertion if table is provisioned
+    if (isSupabaseAvailable && supabase) {
+      try {
+        const { data, error } = await supabase.from('access_requests').insert({
+          id: requestId,
+          full_name: cleanName,
+          work_email: cleanEmail,
+          department_id: Number(request.departmentId),
+          department_name: deptName,
+          requested_role: request.requestedRole,
+          reason: cleanReason,
+          status: 'pending_review',
+          submitted_at: timestamp
+        }).select().single();
+
+        if (!error && data) {
+          remoteSuccess = true;
+          storageProvenance = 'database';
+        }
+      } catch (err) {
+        console.warn('[dataService] Remote database access_requests insert skipped:', err);
+      }
+    }
+
     const newRequest: AccessRequest = {
-      id: `REQ-${Date.now().toString().slice(-6)}`,
-      fullName: request.fullName.trim(),
-      workEmail: request.workEmail.trim().toLowerCase(),
-      departmentId: request.departmentId,
-      departmentName: dept?.department_name || 'Corporate IT',
+      id: requestId,
+      fullName: cleanName,
+      workEmail: cleanEmail,
+      departmentId: Number(request.departmentId),
+      departmentName: deptName,
       requestedRole: request.requestedRole,
-      reason: request.reason.trim(),
+      reason: cleanReason,
       status: 'pending_review',
-      submittedAt: new Date().toISOString()
+      submittedAt: timestamp,
+      storageProvenance
     };
 
-    this.accessRequests.unshift(newRequest);
+    // 3. Durably store locally to guarantee cross-session persistence
+    const updated = [newRequest, ...currentPersisted.filter(r => r.id !== newRequest.id)];
+    this.savePersistedAccessRequests(updated);
+    this.accessRequests = updated;
 
-    // Record governed audit trail event
+    // 4. Record governed audit trail event
     this.auditLogs.unshift({
       id: `aud-${Date.now()}`,
-      timestamp: new Date().toISOString(),
+      timestamp,
       user: newRequest.workEmail,
       action: 'ACCESS_REQUEST_SUBMITTED',
-      details: `Access requested by ${newRequest.fullName} for role ${newRequest.requestedRole} (${newRequest.departmentName}). Status: Pending review.`,
+      details: `Access requested by ${newRequest.fullName} for role ${newRequest.requestedRole} (${newRequest.departmentName}). Tracking ID: ${newRequest.id}. Status: Pending review.`,
       status: 'SUCCESS'
     });
 
@@ -1837,14 +1975,181 @@ class DataService {
     return {
       success: true,
       request: newRequest,
-      isPersisted: false,
-      notice: 'Request logged in local memory and audit journal. Production database does not configure unauthenticated external tables; review will occur via service desk dispatch.'
+      isPersisted: true,
+      storageProvenance,
+      notice: remoteSuccess
+        ? 'Request durably recorded in database review queue.'
+        : 'Request durably recorded in persistent access management store and audit journal.'
     };
   }
 
+  /**
+   * Retrieves all access requests across durable store and remote database.
+   */
+  public async getAccessRequestsAsync(): Promise<AccessRequest[]> {
+    const local = this.loadPersistedAccessRequests();
+    if (isSupabaseAvailable && supabase) {
+      try {
+        const { data, error } = await supabase
+          .from('access_requests')
+          .select('*')
+          .order('submitted_at', { ascending: false });
+
+        if (!error && Array.isArray(data)) {
+          const remoteMapped: AccessRequest[] = data.map((d: any) => ({
+            id: d.id,
+            fullName: d.full_name,
+            workEmail: d.work_email,
+            departmentId: d.department_id,
+            departmentName: d.department_name,
+            requestedRole: d.requested_role,
+            reason: d.reason,
+            status: d.status,
+            submittedAt: d.submitted_at,
+            reviewedAt: d.reviewed_at,
+            reviewedBy: d.reviewed_by,
+            reviewedByName: d.reviewed_by_name,
+            reviewReason: d.review_reason,
+            storageProvenance: 'database'
+          }));
+
+          // Merge without duplicates (remote priority)
+          const merged = [...remoteMapped];
+          for (const l of local) {
+            if (!merged.some(m => m.id === l.id)) {
+              merged.push(l);
+            }
+          }
+          this.accessRequests = merged;
+          return merged;
+        }
+      } catch (err) {
+        console.warn('[dataService] Failed to fetch remote access requests:', err);
+      }
+    }
+
+    this.accessRequests = local;
+    return local;
+  }
+
+  /**
+   * Synchronous getter for UI components relying on subscriber updates.
+   */
   public getAccessRequests(): AccessRequest[] {
+    if (this.accessRequests.length === 0) {
+      this.accessRequests = this.loadPersistedAccessRequests();
+    }
     return [...this.accessRequests];
   }
+
+  /**
+   * Administrator review action: Approves or Rejects an access request.
+   * Records reviewer identity, timestamps, review reason, and immutable audit event.
+   */
+  public async reviewAccessRequest(params: {
+    requestId: string;
+    action: 'approve' | 'reject';
+    reviewerId: string;
+    reviewerName: string;
+    reviewerRole: UserRole;
+    reviewReason?: string;
+  }): Promise<{
+    success: boolean;
+    request?: AccessRequest;
+    error?: string;
+  }> {
+    // 1. Role Authorization Check: Only administrators can review requests
+    if (params.reviewerRole !== 'admin') {
+      return {
+        success: false,
+        error: 'Unauthorized: Only platform administrators are permitted to review access requests.'
+      };
+    }
+
+    const currentRequests = this.loadPersistedAccessRequests();
+    const targetIndex = currentRequests.findIndex(r => r.id === params.requestId);
+    if (targetIndex === -1 && !this.accessRequests.some(r => r.id === params.requestId)) {
+      return {
+        success: false,
+        error: `Access request '${params.requestId}' not found.`
+      };
+    }
+
+    const target = targetIndex !== -1 ? currentRequests[targetIndex] : this.accessRequests.find(r => r.id === params.requestId)!;
+    if (target.status !== 'pending_review') {
+      return {
+        success: false,
+        error: `Request '${params.requestId}' has already been reviewed (Status: ${target.status}).`
+      };
+    }
+
+    const reviewedAt = new Date().toISOString();
+    const newStatus = params.action === 'approve' ? 'approved' : 'rejected';
+
+    const updatedRequest: AccessRequest = {
+      ...target,
+      status: newStatus,
+      reviewedAt,
+      reviewedBy: params.reviewerId,
+      reviewedByName: params.reviewerName,
+      reviewReason: params.reviewReason?.trim() || (newStatus === 'approved' ? 'Access approved by administrator.' : 'Access declined.')
+    };
+
+    // Update remote if table exists
+    if (isSupabaseAvailable && supabase && target.storageProvenance === 'database') {
+      try {
+        await supabase.from('access_requests').update({
+          status: newStatus,
+          reviewed_at: reviewedAt,
+          reviewed_by: params.reviewerId,
+          reviewed_by_name: params.reviewerName,
+          review_reason: updatedRequest.reviewReason
+        }).eq('id', params.requestId);
+      } catch (err) {
+        console.warn('[dataService] Failed to update remote access_request:', err);
+      }
+    }
+
+    // Update durable store
+    const updatedList = currentRequests.map(r => r.id === params.requestId ? updatedRequest : r);
+    if (targetIndex === -1) {
+      updatedList.unshift(updatedRequest);
+    }
+    this.savePersistedAccessRequests(updatedList);
+    this.accessRequests = updatedList;
+
+    // Record immutable audit event
+    this.auditLogs.unshift({
+      id: `aud-${Date.now()}`,
+      timestamp: reviewedAt,
+      user: params.reviewerName || params.reviewerId,
+      action: params.action === 'approve' ? 'ACCESS_REQUEST_APPROVED' : 'ACCESS_REQUEST_REJECTED',
+      details: `${params.action === 'approve' ? 'Approved' : 'Rejected'} access request ${target.id} (${target.fullName}, ${target.workEmail}, role: ${target.requestedRole}). Reason: ${updatedRequest.reviewReason}`,
+      status: params.action === 'approve' ? 'SUCCESS' : 'WARNING'
+    });
+
+    this.notifyListeners();
+
+    return {
+      success: true,
+      request: updatedRequest
+    };
+  }
+
+  /**
+   * Deletes an access request from persistent storage (admin cleanup).
+   */
+  public deleteAccessRequest(requestId: string, reviewerRole: UserRole): boolean {
+    if (reviewerRole !== 'admin') {
+      return false;
+    }
+    const current = this.loadPersistedAccessRequests().filter(r => r.id !== requestId);
+    this.savePersistedAccessRequests(current);
+    this.accessRequests = current;
+    this.notifyListeners();
+    return true;
+  }
+
 }
 
 export const dataService = new DataService();

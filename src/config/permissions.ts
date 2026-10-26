@@ -91,6 +91,7 @@ export const ROUTE_PERMISSIONS: RoutePermission[] = [
   { path: '/admin/upload', category: 'admin', allowedRoles: ['admin'], description: 'Dataset Ingestion & Batch Upload' },
   { path: '/admin/sla', category: 'admin', allowedRoles: ['admin'], description: 'SLA Threshold Policy Configuration' },
   { path: '/admin/users', category: 'admin', allowedRoles: ['admin'], description: 'User & Role Management' },
+  { path: '/admin/access-requests', category: 'admin', allowedRoles: ['admin'], description: 'Access Request Queue & Administrator Review' },
   { path: '/admin/security', category: 'admin', allowedRoles: ['admin'], description: 'Security Settings & MFA' }
 ];
 

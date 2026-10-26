@@ -47,8 +47,8 @@ async function runAuthRoutingTests() {
     // -------------------------------------------------------------------------
     console.log('Suite 1: Permission Matrix & Route Pattern Matching...');
 
-    await test('ROUTE_PERMISSIONS contains all 37 application paths across 6 categories', () => {
-      assert.equal(ROUTE_PERMISSIONS.length, 37);
+    await test('ROUTE_PERMISSIONS contains all 38 application paths across 6 categories', () => {
+      assert.equal(ROUTE_PERMISSIONS.length, 38);
       const publicRoutes = ROUTE_PERMISSIONS.filter((r) => r.category === 'public');
       const sharedRoutes = ROUTE_PERMISSIONS.filter((r) => r.category === 'shared');
       const employeeRoutes = ROUTE_PERMISSIONS.filter((r) => r.category === 'employee');
@@ -61,7 +61,7 @@ async function runAuthRoutingTests() {
       assert.equal(employeeRoutes.length, 6, 'Expected 6 employee routes');
       assert.equal(agentRoutes.length, 5, 'Expected 5 agent routes');
       assert.equal(analyticsRoutes.length, 10, 'Expected 10 analytics routes');
-      assert.equal(adminRoutes.length, 6, 'Expected 6 admin routes');
+      assert.equal(adminRoutes.length, 7, 'Expected 7 admin routes');
     });
 
     await test('matchRoutePattern handles exact matches, query strings, and URL hash fragments', () => {
@@ -198,6 +198,7 @@ async function runAuthRoutingTests() {
       assert.equal(canAccessRoute('/admin/upload', 'manager').allowed, false, 'Manager must be denied /admin/upload under least privilege');
       assert.equal(canAccessRoute('/admin/sla', 'manager').allowed, false);
       assert.equal(canAccessRoute('/admin/users', 'manager').allowed, false);
+      assert.equal(canAccessRoute('/admin/access-requests', 'manager').allowed, false, 'Manager must be denied /admin/access-requests');
       assert.equal(canAccessRoute('/admin/security', 'manager').allowed, false);
     });
 

@@ -232,4 +232,7 @@ export interface AccessRequest {
   submittedAt: string;
   reviewedAt?: string;
   reviewedBy?: string;
+  reviewedByName?: string;
+  reviewReason?: string;
+  storageProvenance?: 'database' | 'persistent_storage';
 }

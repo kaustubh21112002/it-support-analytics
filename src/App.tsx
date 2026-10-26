@@ -54,6 +54,7 @@ const SlaConfigPage = React.lazy(() => import('./pages/admin/AdminPages').then(m
 const DataWorkbenchPage = React.lazy(() => import('./pages/admin/AdminPages').then(m => ({ default: m.DataWorkbenchPage })));
 const AdminUploadPage = React.lazy(() => import('./pages/admin/AdminUploadPage').then(m => ({ default: m.AdminUploadPage })));
 const SecuritySettingsPage = React.lazy(() => import('./pages/admin/AdminPages').then(m => ({ default: m.SecuritySettingsPage })));
+const AdminAccessRequestsPage = React.lazy(() => import('./pages/admin/AdminAccessRequestsPage').then(m => ({ default: m.AdminAccessRequestsPage })));
 
 // Shared
 const NotificationsPage = React.lazy(() => import('./pages/shared/SharedPages').then(m => ({ default: m.NotificationsPage })));
@@ -268,6 +269,14 @@ export const App: React.FC = () => {
               element={
                 <ProtectedRoute allowedRoles={['admin']}>
                   <AppShell><UserManagementPage /></AppShell>
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/admin/access-requests"
+              element={
+                <ProtectedRoute allowedRoles={['admin']}>
+                  <AppShell><AdminAccessRequestsPage /></AppShell>
                 </ProtectedRoute>
               }
             />
