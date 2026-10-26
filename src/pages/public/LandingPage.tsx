@@ -65,7 +65,7 @@ export const LandingPage: React.FC = () => {
               to="/login"
               className="hidden sm:inline-block px-2.5 py-1.5 text-xs sm:text-sm font-semibold text-text-secondary hover:text-text-primary transition-colors"
             >
-              Sign In
+              Sign Up
             </Link>
             <Link
               to="/login"
