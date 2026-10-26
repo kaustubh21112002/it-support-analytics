@@ -47,8 +47,8 @@ async function runAuthRoutingTests() {
     // -------------------------------------------------------------------------
     console.log('Suite 1: Permission Matrix & Route Pattern Matching...');
 
-    await test('ROUTE_PERMISSIONS contains all 36 application paths across 6 categories', () => {
-      assert.equal(ROUTE_PERMISSIONS.length, 36);
+    await test('ROUTE_PERMISSIONS contains all 37 application paths across 6 categories', () => {
+      assert.equal(ROUTE_PERMISSIONS.length, 37);
       const publicRoutes = ROUTE_PERMISSIONS.filter((r) => r.category === 'public');
       const sharedRoutes = ROUTE_PERMISSIONS.filter((r) => r.category === 'shared');
       const employeeRoutes = ROUTE_PERMISSIONS.filter((r) => r.category === 'employee');
@@ -56,7 +56,7 @@ async function runAuthRoutingTests() {
       const analyticsRoutes = ROUTE_PERMISSIONS.filter((r) => r.category === 'analytics');
       const adminRoutes = ROUTE_PERMISSIONS.filter((r) => r.category === 'admin');
 
-      assert.equal(publicRoutes.length, 7, 'Expected 7 public routes');
+      assert.equal(publicRoutes.length, 8, 'Expected 8 public routes');
       assert.equal(sharedRoutes.length, 2, 'Expected 2 shared routes');
       assert.equal(employeeRoutes.length, 6, 'Expected 6 employee routes');
       assert.equal(agentRoutes.length, 5, 'Expected 5 agent routes');
@@ -68,6 +68,10 @@ async function runAuthRoutingTests() {
       const matchLogin = matchRoutePattern('/login');
       assert.ok(matchLogin);
       assert.equal(matchLogin.category, 'public');
+
+      const matchRequestAccess = matchRoutePattern('/request-access');
+      assert.ok(matchRequestAccess);
+      assert.equal(matchRequestAccess.category, 'public');
 
       const matchSla = matchRoutePattern('/admin/sla?filter=all');
       assert.ok(matchSla);
@@ -103,7 +107,7 @@ async function runAuthRoutingTests() {
     console.log('\nSuite 2: Unauthenticated Direct Route Access...');
 
     await test('Public routes allow unauthenticated access', () => {
-      ['/', '/login', '/verify', '/forgot-password', '/reset-password', '/403', '/404'].forEach((p) => {
+      ['/', '/request-access', '/login', '/verify', '/forgot-password', '/reset-password', '/403', '/404'].forEach((p) => {
         const check = canAccessRoute(p, undefined);
         assert.equal(check.allowed, true, `Expected public access for ${p}`);
         assert.equal(check.isPublic, true);

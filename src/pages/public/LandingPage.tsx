@@ -62,7 +62,7 @@ export const LandingPage: React.FC = () => {
 
           <div className="flex items-center gap-2 shrink-0">
             <Link
-              to="/login"
+              to="/request-access"
               className="hidden sm:inline-block px-2.5 py-1.5 text-xs sm:text-sm font-semibold text-text-secondary hover:text-text-primary transition-colors"
             >
               Sign Up

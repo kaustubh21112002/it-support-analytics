@@ -219,3 +219,17 @@ export interface AuditEvent {
   details: string;
   status: 'SUCCESS' | 'WARNING' | 'FAILED';
 }
+
+export interface AccessRequest {
+  id: string;
+  fullName: string;
+  workEmail: string;
+  departmentId: number;
+  departmentName: string;
+  requestedRole: UserRole;
+  reason: string;
+  status: 'pending_review' | 'approved' | 'rejected';
+  submittedAt: string;
+  reviewedAt?: string;
+  reviewedBy?: string;
+}

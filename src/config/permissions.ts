@@ -46,6 +46,7 @@ export interface ActionPermission {
 export const ROUTE_PERMISSIONS: RoutePermission[] = [
   // Public Routes (Accessible without authentication)
   { path: '/', category: 'public', description: 'Platform Public Landing Page' },
+  { path: '/request-access', category: 'public', description: 'Employee & Stakeholder Access Request Form' },
   { path: '/login', category: 'public', description: 'Authentication & Demo Role Selection' },
   { path: '/verify', category: 'public', description: 'Two-Factor / Demo OTP Verification' },
   { path: '/forgot-password', category: 'public', description: 'Password Recovery Flow' },

@@ -14,6 +14,7 @@ const RouteLoadingFallback: React.FC = () => (
 
 // Public & Auth (Code-split chunks)
 const LandingPage = React.lazy(() => import('./pages/public/LandingPage').then(m => ({ default: m.LandingPage })));
+const RequestAccessPage = React.lazy(() => import('./pages/public/RequestAccessPage').then(m => ({ default: m.RequestAccessPage })));
 const LoginPage = React.lazy(() => import('./pages/auth/LoginPage').then(m => ({ default: m.LoginPage })));
 const VerifyOtpPage = React.lazy(() => import('./pages/auth/VerifyOtpPage').then(m => ({ default: m.VerifyOtpPage })));
 const ForgotPasswordPage = React.lazy(() => import('./pages/auth/PasswordResetPages').then(m => ({ default: m.ForgotPasswordPage })));
@@ -71,6 +72,7 @@ export const App: React.FC = () => {
             <Routes>
             {/* Public routes without AppShell */}
             <Route path="/" element={<LandingPage />} />
+            <Route path="/request-access" element={<RequestAccessPage />} />
             <Route path="/login" element={<LoginPage />} />
             <Route path="/verify" element={<VerifyOtpPage />} />
             <Route path="/forgot-password" element={<ForgotPasswordPage />} />

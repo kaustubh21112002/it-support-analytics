@@ -23,7 +23,8 @@ import {
   User,
   TicketStatus,
   TicketPriority,
-  UserRole
+  UserRole,
+  AccessRequest
 } from '../types';
 import { DEMO_USERS } from './demoUsers';
 import {
@@ -192,6 +193,7 @@ class DataService {
   private notifications: NotificationItem[] = [];
   private auditLogs: AuditEvent[] = [...SEEDED_AUDIT_LOGS];
   private users: User[] = [...DEMO_USERS];
+  private accessRequests: AccessRequest[] = [];
 
   // Provenance and Hydration state
   private dataSource: 'seeded' | 'live' = 'seeded';
@@ -1784,6 +1786,64 @@ class DataService {
     ]);
 
     return [headers.join(','), ...rows.map(r => r.join(','))].join('\n');
+  }
+
+  /**
+   * Submits an access request for organizational review.
+   * SECURITY INVARIANT:
+   * 1. This unauthenticated submission creates an immutable pending review ticket in session memory / audit log.
+   * 2. It NEVER creates an active auth user, nor does it grant roles or elevated permissions.
+   * 3. Discloses clear persistence provenance (session cache vs live remote delivery).
+   */
+  public submitAccessRequest(request: {
+    fullName: string;
+    workEmail: string;
+    departmentId: number;
+    requestedRole: UserRole;
+    reason: string;
+  }): {
+    success: boolean;
+    request: AccessRequest;
+    isPersisted: boolean;
+    notice: string;
+  } {
+    const dept = this.departments.find(d => d.department_id === request.departmentId);
+    const newRequest: AccessRequest = {
+      id: `REQ-${Date.now().toString().slice(-6)}`,
+      fullName: request.fullName.trim(),
+      workEmail: request.workEmail.trim().toLowerCase(),
+      departmentId: request.departmentId,
+      departmentName: dept?.department_name || 'Corporate IT',
+      requestedRole: request.requestedRole,
+      reason: request.reason.trim(),
+      status: 'pending_review',
+      submittedAt: new Date().toISOString()
+    };
+
+    this.accessRequests.unshift(newRequest);
+
+    // Record governed audit trail event
+    this.auditLogs.unshift({
+      id: `aud-${Date.now()}`,
+      timestamp: new Date().toISOString(),
+      user: newRequest.workEmail,
+      action: 'ACCESS_REQUEST_SUBMITTED',
+      details: `Access requested by ${newRequest.fullName} for role ${newRequest.requestedRole} (${newRequest.departmentName}). Status: Pending review.`,
+      status: 'SUCCESS'
+    });
+
+    this.notifyListeners();
+
+    return {
+      success: true,
+      request: newRequest,
+      isPersisted: false,
+      notice: 'Request logged in local memory and audit journal. Production database does not configure unauthenticated external tables; review will occur via service desk dispatch.'
+    };
+  }
+
+  public getAccessRequests(): AccessRequest[] {
+    return [...this.accessRequests];
   }
 }
 
