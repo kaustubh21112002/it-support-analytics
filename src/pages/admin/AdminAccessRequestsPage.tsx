@@ -32,6 +32,8 @@ export const AdminAccessRequestsPage: React.FC = () => {
   const [statusFilter, setStatusFilter] = useState<'all' | 'pending_review' | 'approved' | 'rejected'>('all');
   const [roleFilter, setRoleFilter] = useState<'all' | UserRole>('all');
   const [loading, setLoading] = useState(false);
+  const [queueError, setQueueError] = useState<string | null>(null);
+  const [isAuthoritativeStore, setIsAuthoritativeStore] = useState<boolean>(true);
   const [selectedRequest, setSelectedRequest] = useState<AccessRequest | null>(null);
 
   // Review modal state
@@ -42,8 +44,13 @@ export const AdminAccessRequestsPage: React.FC = () => {
 
   const loadRequests = async () => {
     setLoading(true);
-    const data = await dataService.getAccessRequestsAsync();
-    setRequests(data);
+    setQueueError(null);
+    const result = await dataService.getAccessRequestsAsync();
+    setRequests(result.requests);
+    setIsAuthoritativeStore(result.isAuthoritative);
+    if (result.error) {
+      setQueueError(result.error);
+    }
     setLoading(false);
   };
 
@@ -119,8 +126,8 @@ export const AdminAccessRequestsPage: React.FC = () => {
 
   const handleDelete = (id: string) => {
     if (!user || user.role !== 'admin') return;
-    if (window.confirm(`Permanently remove access request record ${id}?`)) {
-      dataService.deleteAccessRequest(id, user.role);
+    if (window.confirm(`Permanently remove demo access request record ${id}?`)) {
+      dataService.deleteDemoAccessRequest(id, user.role);
       loadRequests();
       if (selectedRequest?.id === id) {
         setSelectedRequest(null);
@@ -170,6 +177,33 @@ export const AdminAccessRequestsPage: React.FC = () => {
           variant="brand"
         />
       </div>
+
+      {/* Authoritative Database Storage Status Banner */}
+      {queueError && (
+        <div
+          role="alert"
+          className="p-4 rounded-xl border border-amber-300 bg-amber-50 text-amber-900 text-xs space-y-2"
+        >
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2 font-bold">
+              <AlertTriangle className="w-4 h-4 text-amber-600 shrink-0" />
+              <span>Production Database Configuration Required</span>
+            </div>
+            <button
+              onClick={loadRequests}
+              className="px-2.5 py-1 text-[11px] font-semibold bg-white border border-amber-300 hover:bg-amber-100 rounded-md text-amber-900 transition-colors"
+            >
+              Retry Connection
+            </button>
+          </div>
+          <p className="text-[11px] leading-relaxed text-amber-800">
+            {queueError}
+          </p>
+          <p className="text-[10px] text-amber-700 italic border-t border-amber-200/80 pt-1">
+            Governance Notice: To ensure zero data loss and shared administrative consensus, access requests must be persisted in Supabase PostgreSQL (table public.access_requests). Apply staged migration <code className="font-mono bg-amber-100/80 px-1 py-0.5 rounded">access_requests_migration.sql</code> in the Supabase SQL editor.
+          </p>
+        </div>
+      )}
 
       {actionFeedback && (
         <div

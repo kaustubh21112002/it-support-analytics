@@ -1788,16 +1788,15 @@ class DataService {
     return [headers.join(','), ...rows.map(r => r.join(','))].join('\n');
   }
 
-  private static ACCESS_REQUESTS_STORAGE_KEY = 'itsupport_access_requests_store';
+  private static ACCESS_REQUESTS_DEMO_STORAGE_KEY = 'itsupport_access_requests_demo_store';
 
   /**
-   * Loads persisted access requests from localStorage.
-   * Provides durable cross-session and cross-tab storage for access requests.
+   * Loads persisted access requests for DEMO sessions only.
    */
-  private loadPersistedAccessRequests(): AccessRequest[] {
+  private loadDemoAccessRequests(): AccessRequest[] {
     try {
       if (typeof window !== 'undefined' && window.localStorage) {
-        const raw = window.localStorage.getItem(DataService.ACCESS_REQUESTS_STORAGE_KEY);
+        const raw = window.localStorage.getItem(DataService.ACCESS_REQUESTS_DEMO_STORAGE_KEY);
         if (raw) {
           const parsed = JSON.parse(raw);
           if (Array.isArray(parsed)) {
@@ -1806,47 +1805,52 @@ class DataService {
         }
       }
     } catch (err) {
-      console.warn('[dataService] Failed to load persisted access requests:', err);
+      console.warn('[dataService] Failed to load demo access requests:', err);
     }
     return [];
   }
 
   /**
-   * Persists access requests to durable localStorage.
+   * Persists access requests for DEMO sessions only.
    */
-  private savePersistedAccessRequests(requests: AccessRequest[]): void {
+  private saveDemoAccessRequests(requests: AccessRequest[]): void {
     try {
       if (typeof window !== 'undefined' && window.localStorage) {
-        window.localStorage.setItem(DataService.ACCESS_REQUESTS_STORAGE_KEY, JSON.stringify(requests));
+        window.localStorage.setItem(DataService.ACCESS_REQUESTS_DEMO_STORAGE_KEY, JSON.stringify(requests));
       }
     } catch (err) {
-      console.warn('[dataService] Failed to persist access requests:', err);
+      console.warn('[dataService] Failed to persist demo access requests:', err);
     }
   }
 
   /**
    * Submits an access request for organizational review.
-   * SECURITY INVARIANT:
-   * 1. This unauthenticated submission creates a durable, immutable pending review ticket in persistent storage & audit log.
-   * 2. It NEVER creates an active auth user, nor does it grant roles or elevated permissions.
-   * 3. Prevents duplicate submissions for identical work email and requested role in pending state.
-   * 4. Attempts remote Supabase persistence if available; falls back to durable persistent storage.
+   * PRODUCTION STORAGE CONTRACT:
+   * 1. Supabase PostgreSQL `public.access_requests` is the authoritative production store.
+   * 2. If the Supabase backend or table is unconfigured, it reports an explicit configuration-required error.
+   *    It NEVER falsely claims successful durable submission in production when it was only saved locally.
+   * 3. Prevents duplicate pending submissions for the same email and requested role.
+   * 4. Enforces strict input validation before dispatch.
+   * 5. An explicit `isDemo` flag allows isolated interactive testing in demo environments without misrepresentation.
    */
-  public async submitAccessRequest(request: {
-    fullName: string;
-    workEmail: string;
-    departmentId: number;
-    requestedRole: UserRole;
-    reason: string;
-  }): Promise<{
+  public async submitAccessRequest(
+    request: {
+      fullName: string;
+      workEmail: string;
+      departmentId: number;
+      requestedRole: UserRole;
+      reason: string;
+    },
+    options?: { isDemoSubmission?: boolean }
+  ): Promise<{
     success: boolean;
     request?: AccessRequest;
-    isPersisted: boolean;
-    storageProvenance: 'database' | 'persistent_storage';
+    isAuthoritative: boolean;
+    storageProvenance: 'database' | 'demo_mode';
     error?: string;
     notice: string;
   }> {
-    // 1. Strict server-side validation
+    // 1. Strict input validation at service boundary
     const cleanName = request.fullName ? request.fullName.trim() : '';
     const cleanEmail = request.workEmail ? request.workEmail.trim().toLowerCase() : '';
     const cleanReason = request.reason ? request.reason.trim() : '';
@@ -1854,8 +1858,8 @@ class DataService {
     if (!cleanName || cleanName.length < 2) {
       return {
         success: false,
-        isPersisted: false,
-        storageProvenance: 'persistent_storage',
+        isAuthoritative: false,
+        storageProvenance: options?.isDemoSubmission ? 'demo_mode' : 'database',
         error: 'Please provide a valid full legal or directory name (minimum 2 characters).',
         notice: 'Validation failed.'
       };
@@ -1865,8 +1869,8 @@ class DataService {
     if (!cleanEmail || !emailPattern.test(cleanEmail)) {
       return {
         success: false,
-        isPersisted: false,
-        storageProvenance: 'persistent_storage',
+        isAuthoritative: false,
+        storageProvenance: options?.isDemoSubmission ? 'demo_mode' : 'database',
         error: 'Please provide a valid corporate work email address.',
         notice: 'Validation failed.'
       };
@@ -1876,8 +1880,8 @@ class DataService {
     if (!validRoles.includes(request.requestedRole)) {
       return {
         success: false,
-        isPersisted: false,
-        storageProvenance: 'persistent_storage',
+        isAuthoritative: false,
+        storageProvenance: options?.isDemoSubmission ? 'demo_mode' : 'database',
         error: 'Invalid requested role tier specified.',
         notice: 'Validation failed.'
       };
@@ -1886,27 +1890,10 @@ class DataService {
     if (!cleanReason || cleanReason.length < 15) {
       return {
         success: false,
-        isPersisted: false,
-        storageProvenance: 'persistent_storage',
+        isAuthoritative: false,
+        storageProvenance: options?.isDemoSubmission ? 'demo_mode' : 'database',
         error: 'Please provide a comprehensive business justification (minimum 15 characters).',
         notice: 'Validation failed.'
-      };
-    }
-
-    // Refresh memory cache from durable storage
-    const currentPersisted = this.loadPersistedAccessRequests();
-    const existingIndex = currentPersisted.findIndex(
-      r => r.workEmail === cleanEmail && r.requestedRole === request.requestedRole && r.status === 'pending_review'
-    );
-
-    if (existingIndex !== -1) {
-      const existing = currentPersisted[existingIndex];
-      return {
-        success: false,
-        isPersisted: true,
-        storageProvenance: existing.storageProvenance || 'persistent_storage',
-        error: `A pending access request for ${cleanEmail} for the '${request.requestedRole}' role is already under review (Reference: ${existing.id}). Duplicate submission rejected.`,
-        notice: 'Duplicate active submission prevented.'
       };
     }
 
@@ -1915,136 +1902,263 @@ class DataService {
     const requestId = `REQ-${Date.now().toString().slice(-6)}-${Math.random().toString(36).substring(2, 5).toUpperCase()}`;
     const timestamp = new Date().toISOString();
 
-    let storageProvenance: 'database' | 'persistent_storage' = 'persistent_storage';
-    let remoteSuccess = false;
-
-    // 2. Attempt remote Supabase insertion if table is provisioned
-    if (isSupabaseAvailable && supabase) {
-      try {
-        const { data, error } = await supabase.from('access_requests').insert({
-          id: requestId,
-          full_name: cleanName,
-          work_email: cleanEmail,
-          department_id: Number(request.departmentId),
-          department_name: deptName,
-          requested_role: request.requestedRole,
-          reason: cleanReason,
-          status: 'pending_review',
-          submitted_at: timestamp
-        }).select().single();
-
-        if (!error && data) {
-          remoteSuccess = true;
-          storageProvenance = 'database';
-        }
-      } catch (err) {
-        console.warn('[dataService] Remote database access_requests insert skipped:', err);
+    // -------------------------------------------------------------------------
+    // CASE A: Explicit Demo Mode Submission
+    // -------------------------------------------------------------------------
+    if (options?.isDemoSubmission) {
+      const demoList = this.loadDemoAccessRequests();
+      const duplicateIndex = demoList.findIndex(
+        r => r.workEmail === cleanEmail && r.requestedRole === request.requestedRole && r.status === 'pending_review'
+      );
+      if (duplicateIndex !== -1) {
+        return {
+          success: false,
+          isAuthoritative: false,
+          storageProvenance: 'demo_mode',
+          error: `A pending access request for ${cleanEmail} for the '${request.requestedRole}' role is already under review (Reference: ${demoList[duplicateIndex].id}). Duplicate submission rejected.`,
+          notice: 'Duplicate active submission prevented.'
+        };
       }
+
+      const demoRequest: AccessRequest = {
+        id: requestId,
+        fullName: cleanName,
+        workEmail: cleanEmail,
+        departmentId: Number(request.departmentId),
+        departmentName: deptName,
+        requestedRole: request.requestedRole,
+        reason: cleanReason,
+        status: 'pending_review',
+        submittedAt: timestamp,
+        storageProvenance: 'demo_mode'
+      };
+
+      const updatedDemo = [demoRequest, ...demoList];
+      this.saveDemoAccessRequests(updatedDemo);
+      this.accessRequests = updatedDemo;
+
+      this.auditLogs.unshift({
+        id: `aud-${Date.now()}`,
+        timestamp,
+        user: cleanEmail,
+        action: 'ACCESS_REQUEST_SUBMITTED',
+        details: `[DEMO MODE] Access requested by ${cleanName} for role ${request.requestedRole} (${deptName}). Tracking ID: ${requestId}. Status: Pending review.`,
+        status: 'SUCCESS'
+      });
+
+      this.notifyListeners();
+
+      return {
+        success: true,
+        request: demoRequest,
+        isAuthoritative: false,
+        storageProvenance: 'demo_mode',
+        notice: 'Request recorded in isolated local demo session (Demo Sandbox Mode).'
+      };
     }
 
-    const newRequest: AccessRequest = {
-      id: requestId,
-      fullName: cleanName,
-      workEmail: cleanEmail,
-      departmentId: Number(request.departmentId),
-      departmentName: deptName,
-      requestedRole: request.requestedRole,
-      reason: cleanReason,
-      status: 'pending_review',
-      submittedAt: timestamp,
-      storageProvenance
-    };
+    // -------------------------------------------------------------------------
+    // CASE B: Authoritative Production Supabase Submission
+    // -------------------------------------------------------------------------
+    if (!isSupabaseAvailable || !supabase) {
+      return {
+        success: false,
+        isAuthoritative: false,
+        storageProvenance: 'database',
+        error: 'Production database client is not configured (VITE_SUPABASE_URL or VITE_SUPABASE_ANON_KEY missing). Submission cannot be durably recorded.',
+        notice: 'Authoritative backend unavailable.'
+      };
+    }
 
-    // 3. Durably store locally to guarantee cross-session persistence
-    const updated = [newRequest, ...currentPersisted.filter(r => r.id !== newRequest.id)];
-    this.savePersistedAccessRequests(updated);
-    this.accessRequests = updated;
+    try {
+      const { data, error } = await supabase.from('access_requests').insert({
+        id: requestId,
+        full_name: cleanName,
+        work_email: cleanEmail,
+        department_id: Number(request.departmentId),
+        department_name: deptName,
+        requested_role: request.requestedRole,
+        reason: cleanReason,
+        status: 'pending_review',
+        submitted_at: timestamp
+      }).select().single();
 
-    // 4. Record governed audit trail event
-    this.auditLogs.unshift({
-      id: `aud-${Date.now()}`,
-      timestamp,
-      user: newRequest.workEmail,
-      action: 'ACCESS_REQUEST_SUBMITTED',
-      details: `Access requested by ${newRequest.fullName} for role ${newRequest.requestedRole} (${newRequest.departmentName}). Tracking ID: ${newRequest.id}. Status: Pending review.`,
-      status: 'SUCCESS'
-    });
+      if (error) {
+        // Table not provisioned in database schema cache
+        if (error.code === 'PGRST205' || error.message?.includes('schema cache') || error.message?.includes('does not exist')) {
+          return {
+            success: false,
+            isAuthoritative: false,
+            storageProvenance: 'database',
+            error: 'Authoritative storage table public.access_requests is not yet provisioned on the Supabase database. Please apply the staged access_requests_migration.sql migration before accepting live submissions.',
+            notice: 'Database schema migration required.'
+          };
+        }
 
-    this.notifyListeners();
+        // Duplicate pending request constraint violation (uq_access_requests_pending)
+        if (error.code === '23505' || error.message?.includes('uq_access_requests_pending')) {
+          return {
+            success: false,
+            isAuthoritative: false,
+            storageProvenance: 'database',
+            error: `An active access request for ${cleanEmail} for the '${request.requestedRole}' role is already pending review in the database. Duplicate submission rejected.`,
+            notice: 'Duplicate active submission prevented by database boundary.'
+          };
+        }
 
-    return {
-      success: true,
-      request: newRequest,
-      isPersisted: true,
-      storageProvenance,
-      notice: remoteSuccess
-        ? 'Request durably recorded in database review queue.'
-        : 'Request durably recorded in persistent access management store and audit journal.'
-    };
+        // Standard RLS / permission or validation error from Postgres
+        return {
+          success: false,
+          isAuthoritative: false,
+          storageProvenance: 'database',
+          error: `Database submission rejected (${error.code || 'DB_ERROR'}): ${error.message}`,
+          notice: 'Database rejection.'
+        };
+      }
+
+      const created: AccessRequest = {
+        id: data.id,
+        fullName: data.full_name,
+        workEmail: data.work_email,
+        departmentId: data.department_id,
+        departmentName: data.department_name,
+        requestedRole: data.requested_role,
+        reason: data.reason,
+        status: data.status,
+        submittedAt: data.submitted_at,
+        storageProvenance: 'database'
+      };
+
+      // Add to session cache and emit audit log
+      this.accessRequests = [created, ...this.accessRequests.filter(r => r.id !== created.id)];
+      this.auditLogs.unshift({
+        id: `aud-${Date.now()}`,
+        timestamp,
+        user: created.workEmail,
+        action: 'ACCESS_REQUEST_SUBMITTED',
+        details: `Access requested by ${created.fullName} for role ${created.requestedRole} (${created.departmentName}). Database Tracking ID: ${created.id}. Status: Pending review.`,
+        status: 'SUCCESS'
+      });
+
+      this.notifyListeners();
+
+      return {
+        success: true,
+        request: created,
+        isAuthoritative: true,
+        storageProvenance: 'database',
+        notice: 'Request recorded in Supabase PostgreSQL review queue.'
+      };
+    } catch (err: any) {
+      return {
+        success: false,
+        isAuthoritative: false,
+        storageProvenance: 'database',
+        error: `Network or infrastructure failure communicating with Supabase: ${err?.message || String(err)}`,
+        notice: 'Backend connection failure.'
+      };
+    }
   }
 
   /**
-   * Retrieves all access requests across durable store and remote database.
+   * Retrieves all access requests from authoritative storage (or demo store if in demo mode).
    */
-  public async getAccessRequestsAsync(): Promise<AccessRequest[]> {
-    const local = this.loadPersistedAccessRequests();
-    if (isSupabaseAvailable && supabase) {
-      try {
-        const { data, error } = await supabase
-          .from('access_requests')
-          .select('*')
-          .order('submitted_at', { ascending: false });
-
-        if (!error && Array.isArray(data)) {
-          const remoteMapped: AccessRequest[] = data.map((d: any) => ({
-            id: d.id,
-            fullName: d.full_name,
-            workEmail: d.work_email,
-            departmentId: d.department_id,
-            departmentName: d.department_name,
-            requestedRole: d.requested_role,
-            reason: d.reason,
-            status: d.status,
-            submittedAt: d.submitted_at,
-            reviewedAt: d.reviewed_at,
-            reviewedBy: d.reviewed_by,
-            reviewedByName: d.reviewed_by_name,
-            reviewReason: d.review_reason,
-            storageProvenance: 'database'
-          }));
-
-          // Merge without duplicates (remote priority)
-          const merged = [...remoteMapped];
-          for (const l of local) {
-            if (!merged.some(m => m.id === l.id)) {
-              merged.push(l);
-            }
-          }
-          this.accessRequests = merged;
-          return merged;
-        }
-      } catch (err) {
-        console.warn('[dataService] Failed to fetch remote access requests:', err);
-      }
+  public async getAccessRequestsAsync(options?: { isDemoSession?: boolean }): Promise<{
+    requests: AccessRequest[];
+    isAuthoritative: boolean;
+    error?: string;
+  }> {
+    if (options?.isDemoSession) {
+      const demo = this.loadDemoAccessRequests();
+      this.accessRequests = demo;
+      return {
+        requests: demo,
+        isAuthoritative: false
+      };
     }
 
-    this.accessRequests = local;
-    return local;
+    if (!isSupabaseAvailable || !supabase) {
+      return {
+        requests: [],
+        isAuthoritative: false,
+        error: 'Supabase client is not configured. Authoritative access requests cannot be retrieved.'
+      };
+    }
+
+    try {
+      const { data, error } = await supabase
+        .from('access_requests')
+        .select('*')
+        .order('submitted_at', { ascending: false });
+
+      if (error) {
+        if (error.code === 'PGRST205' || error.message?.includes('schema cache')) {
+          return {
+            requests: [],
+            isAuthoritative: false,
+            error: 'Authoritative table public.access_requests is not yet provisioned on Supabase. Execute access_requests_migration.sql.'
+          };
+        }
+        if (error.code === '42501' || error.message?.includes('policy') || error.message?.includes('permission')) {
+          return {
+            requests: [],
+            isAuthoritative: false,
+            error: 'Access denied: Database RLS policy sec_admin_select_access_requests rejected request. Verified administrator session required.'
+          };
+        }
+        return {
+          requests: [],
+          isAuthoritative: false,
+          error: `Database query failed (${error.code || 'DB_ERROR'}): ${error.message}`
+        };
+      }
+
+      const mapped: AccessRequest[] = (data || []).map((d: any) => ({
+        id: d.id,
+        fullName: d.full_name,
+        workEmail: d.work_email,
+        departmentId: d.department_id,
+        departmentName: d.department_name,
+        requestedRole: d.requested_role,
+        reason: d.reason,
+        status: d.status,
+        submittedAt: d.submitted_at,
+        reviewedAt: d.reviewed_at,
+        reviewedBy: d.reviewed_by,
+        reviewedByName: d.reviewed_by_name,
+        reviewReason: d.review_reason,
+        storageProvenance: 'database'
+      }));
+
+      this.accessRequests = mapped;
+      return {
+        requests: mapped,
+        isAuthoritative: true
+      };
+    } catch (err: any) {
+      return {
+        requests: [],
+        isAuthoritative: false,
+        error: `Failed to query Supabase access requests: ${err?.message || String(err)}`
+      };
+    }
   }
 
   /**
-   * Synchronous getter for UI components relying on subscriber updates.
+   * Synchronous getter for subscriber UI components.
    */
   public getAccessRequests(): AccessRequest[] {
-    if (this.accessRequests.length === 0) {
-      this.accessRequests = this.loadPersistedAccessRequests();
-    }
     return [...this.accessRequests];
   }
 
   /**
    * Administrator review action: Approves or Rejects an access request.
-   * Records reviewer identity, timestamps, review reason, and immutable audit event.
+   * AUTHORITATIVE CONTRACT:
+   * 1. Calls trusted database stored procedure `review_access_request` via Supabase RPC (or direct UPDATE with RLS).
+   * 2. Enforces that caller holds verified administrator status in Supabase auth context.
+   * 3. Prevents concurrent decisions from overwriting one another by checking status = 'pending_review'.
+   * 4. Persists reviewer identity, timestamp, and review reason into the database record.
+   * 5. Never grants roles or creates user accounts automatically upon approval.
    */
   public async reviewAccessRequest(params: {
     requestId: string;
@@ -2053,98 +2167,249 @@ class DataService {
     reviewerName: string;
     reviewerRole: UserRole;
     reviewReason?: string;
+    isDemoSession?: boolean;
   }): Promise<{
     success: boolean;
     request?: AccessRequest;
+    isAuthoritative: boolean;
     error?: string;
   }> {
-    // 1. Role Authorization Check: Only administrators can review requests
+    // 1. Client-side guard check (defense in depth; database RLS will strictly enforce this too)
     if (params.reviewerRole !== 'admin') {
       return {
         success: false,
+        isAuthoritative: false,
         error: 'Unauthorized: Only platform administrators are permitted to review access requests.'
-      };
-    }
-
-    const currentRequests = this.loadPersistedAccessRequests();
-    const targetIndex = currentRequests.findIndex(r => r.id === params.requestId);
-    if (targetIndex === -1 && !this.accessRequests.some(r => r.id === params.requestId)) {
-      return {
-        success: false,
-        error: `Access request '${params.requestId}' not found.`
-      };
-    }
-
-    const target = targetIndex !== -1 ? currentRequests[targetIndex] : this.accessRequests.find(r => r.id === params.requestId)!;
-    if (target.status !== 'pending_review') {
-      return {
-        success: false,
-        error: `Request '${params.requestId}' has already been reviewed (Status: ${target.status}).`
       };
     }
 
     const reviewedAt = new Date().toISOString();
     const newStatus = params.action === 'approve' ? 'approved' : 'rejected';
+    const cleanReason = params.reviewReason?.trim() || (newStatus === 'approved' ? 'Access approved by administrator.' : 'Access declined.');
 
-    const updatedRequest: AccessRequest = {
-      ...target,
-      status: newStatus,
-      reviewedAt,
-      reviewedBy: params.reviewerId,
-      reviewedByName: params.reviewerName,
-      reviewReason: params.reviewReason?.trim() || (newStatus === 'approved' ? 'Access approved by administrator.' : 'Access declined.')
-    };
+    // -------------------------------------------------------------------------
+    // CASE A: Demo Session Decision
+    // -------------------------------------------------------------------------
+    if (params.isDemoSession) {
+      const demoList = this.loadDemoAccessRequests();
+      const targetIndex = demoList.findIndex(r => r.id === params.requestId);
+      if (targetIndex === -1) {
+        return {
+          success: false,
+          isAuthoritative: false,
+          error: `Demo request '${params.requestId}' not found.`
+        };
+      }
 
-    // Update remote if table exists
-    if (isSupabaseAvailable && supabase && target.storageProvenance === 'database') {
-      try {
-        await supabase.from('access_requests').update({
+      const target = demoList[targetIndex];
+      if (target.status !== 'pending_review') {
+        return {
+          success: false,
+          isAuthoritative: false,
+          error: `Request '${params.requestId}' has already been decided (Status: ${target.status}). Concurrent overwrite prevented.`
+        };
+      }
+
+      const updated: AccessRequest = {
+        ...target,
+        status: newStatus,
+        reviewedAt,
+        reviewedBy: params.reviewerId,
+        reviewedByName: params.reviewerName,
+        reviewReason: cleanReason
+      };
+
+      demoList[targetIndex] = updated;
+      this.saveDemoAccessRequests(demoList);
+      this.accessRequests = demoList;
+
+      this.auditLogs.unshift({
+        id: `aud-${Date.now()}`,
+        timestamp: reviewedAt,
+        user: params.reviewerName || params.reviewerId,
+        action: params.action === 'approve' ? 'ACCESS_REQUEST_APPROVED' : 'ACCESS_REQUEST_REJECTED',
+        details: `[DEMO MODE] ${params.action === 'approve' ? 'Approved' : 'Rejected'} access request ${target.id} (${target.fullName}, ${target.workEmail}, role: ${target.requestedRole}). Reason: ${cleanReason}`,
+        status: params.action === 'approve' ? 'SUCCESS' : 'WARNING'
+      });
+
+      this.notifyListeners();
+
+      return {
+        success: true,
+        request: updated,
+        isAuthoritative: false
+      };
+    }
+
+    // -------------------------------------------------------------------------
+    // CASE B: Authoritative Supabase Database Review
+    // -------------------------------------------------------------------------
+    if (!isSupabaseAvailable || !supabase) {
+      return {
+        success: false,
+        isAuthoritative: false,
+        error: 'Cannot record administrative decision: Supabase client is not configured.'
+      };
+    }
+
+    try {
+      // 1. Attempt atomic stored procedure review_access_request
+      const { data: rpcData, error: rpcError } = await supabase.rpc('review_access_request', {
+        p_request_id: params.requestId,
+        p_action: params.action,
+        p_reviewer_name: params.reviewerName,
+        p_review_reason: cleanReason
+      });
+
+      if (!rpcError && rpcData?.success) {
+        // Fetch refreshed record
+        const { data: refreshed } = await supabase.from('access_requests').select('*').eq('id', params.requestId).single();
+        const updatedMapped: AccessRequest = refreshed ? {
+          id: refreshed.id,
+          fullName: refreshed.full_name,
+          workEmail: refreshed.work_email,
+          departmentId: refreshed.department_id,
+          departmentName: refreshed.department_name,
+          requestedRole: refreshed.requested_role,
+          reason: refreshed.reason,
+          status: refreshed.status,
+          submittedAt: refreshed.submitted_at,
+          reviewedAt: refreshed.reviewed_at,
+          reviewedBy: refreshed.reviewed_by,
+          reviewedByName: refreshed.reviewed_by_name,
+          reviewReason: refreshed.review_reason,
+          storageProvenance: 'database'
+        } : {
+          id: params.requestId,
+          fullName: 'Applicant',
+          workEmail: 'applicant@company.com',
+          departmentId: 1,
+          departmentName: 'Corporate IT',
+          requestedRole: 'employee',
+          reason: '',
+          status: newStatus,
+          submittedAt: reviewedAt,
+          reviewedAt,
+          reviewedBy: params.reviewerId,
+          reviewedByName: params.reviewerName,
+          reviewReason: cleanReason,
+          storageProvenance: 'database'
+        };
+
+        this.accessRequests = this.accessRequests.map(r => r.id === params.requestId ? updatedMapped : r);
+        this.auditLogs.unshift({
+          id: `aud-${Date.now()}`,
+          timestamp: reviewedAt,
+          user: params.reviewerName || params.reviewerId,
+          action: params.action === 'approve' ? 'ACCESS_REQUEST_APPROVED' : 'ACCESS_REQUEST_REJECTED',
+          details: `${params.action === 'approve' ? 'Approved' : 'Rejected'} access request ${params.requestId}. Decision persisted to Supabase database.`,
+          status: params.action === 'approve' ? 'SUCCESS' : 'WARNING'
+        });
+        this.notifyListeners();
+
+        return {
+          success: true,
+          request: updatedMapped,
+          isAuthoritative: true
+        };
+      }
+
+      // 2. If RPC is not created, execute standard atomic UPDATE guarded by RLS and status = 'pending_review'
+      const { data: updateData, error: updateError } = await supabase
+        .from('access_requests')
+        .update({
           status: newStatus,
           reviewed_at: reviewedAt,
           reviewed_by: params.reviewerId,
           reviewed_by_name: params.reviewerName,
-          review_reason: updatedRequest.reviewReason
-        }).eq('id', params.requestId);
-      } catch (err) {
-        console.warn('[dataService] Failed to update remote access_request:', err);
+          review_reason: cleanReason
+        })
+        .eq('id', params.requestId)
+        .eq('status', 'pending_review') // Optimistic locking: only update if currently pending
+        .select()
+        .single();
+
+      if (updateError) {
+        if (updateError.code === 'PGRST205') {
+          return {
+            success: false,
+            isAuthoritative: false,
+            error: 'Authoritative table public.access_requests is not yet provisioned on Supabase.'
+          };
+        }
+        if (updateError.code === '42501' || updateError.message?.includes('policy')) {
+          return {
+            success: false,
+            isAuthoritative: false,
+            error: 'Database Permission Denied: Only authenticated administrators with verified database privileges can update access requests.'
+          };
+        }
+        return {
+          success: false,
+          isAuthoritative: false,
+          error: `Database decision update failed (${updateError.code || 'DB_ERROR'}): ${updateError.message}`
+        };
       }
+
+      if (!updateData) {
+        return {
+          success: false,
+          isAuthoritative: true,
+          error: `Cannot update request '${params.requestId}'. It may have already been decided by another administrator or does not exist.`
+        };
+      }
+
+      const updatedRecord: AccessRequest = {
+        id: updateData.id,
+        fullName: updateData.full_name,
+        workEmail: updateData.work_email,
+        departmentId: updateData.department_id,
+        departmentName: updateData.department_name,
+        requestedRole: updateData.requested_role,
+        reason: updateData.reason,
+        status: updateData.status,
+        submittedAt: updateData.submitted_at,
+        reviewedAt: updateData.reviewed_at,
+        reviewedBy: updateData.reviewed_by,
+        reviewedByName: updateData.reviewed_by_name,
+        reviewReason: updateData.review_reason,
+        storageProvenance: 'database'
+      };
+
+      this.accessRequests = this.accessRequests.map(r => r.id === params.requestId ? updatedRecord : r);
+      this.auditLogs.unshift({
+        id: `aud-${Date.now()}`,
+        timestamp: reviewedAt,
+        user: params.reviewerName || params.reviewerId,
+        action: params.action === 'approve' ? 'ACCESS_REQUEST_APPROVED' : 'ACCESS_REQUEST_REJECTED',
+        details: `${params.action === 'approve' ? 'Approved' : 'Rejected'} access request ${params.requestId}. Decision persisted to Supabase database.`,
+        status: params.action === 'approve' ? 'SUCCESS' : 'WARNING'
+      });
+      this.notifyListeners();
+
+      return {
+        success: true,
+        request: updatedRecord,
+        isAuthoritative: true
+      };
+    } catch (err: any) {
+      return {
+        success: false,
+        isAuthoritative: false,
+        error: `Network failure executing review on Supabase: ${err?.message || String(err)}`
+      };
     }
-
-    // Update durable store
-    const updatedList = currentRequests.map(r => r.id === params.requestId ? updatedRequest : r);
-    if (targetIndex === -1) {
-      updatedList.unshift(updatedRequest);
-    }
-    this.savePersistedAccessRequests(updatedList);
-    this.accessRequests = updatedList;
-
-    // Record immutable audit event
-    this.auditLogs.unshift({
-      id: `aud-${Date.now()}`,
-      timestamp: reviewedAt,
-      user: params.reviewerName || params.reviewerId,
-      action: params.action === 'approve' ? 'ACCESS_REQUEST_APPROVED' : 'ACCESS_REQUEST_REJECTED',
-      details: `${params.action === 'approve' ? 'Approved' : 'Rejected'} access request ${target.id} (${target.fullName}, ${target.workEmail}, role: ${target.requestedRole}). Reason: ${updatedRequest.reviewReason}`,
-      status: params.action === 'approve' ? 'SUCCESS' : 'WARNING'
-    });
-
-    this.notifyListeners();
-
-    return {
-      success: true,
-      request: updatedRequest
-    };
   }
 
   /**
-   * Deletes an access request from persistent storage (admin cleanup).
+   * Deletes an access request from demo storage.
    */
-  public deleteAccessRequest(requestId: string, reviewerRole: UserRole): boolean {
+  public deleteDemoAccessRequest(requestId: string, reviewerRole: UserRole): boolean {
     if (reviewerRole !== 'admin') {
       return false;
     }
-    const current = this.loadPersistedAccessRequests().filter(r => r.id !== requestId);
-    this.savePersistedAccessRequests(current);
+    const current = this.loadDemoAccessRequests().filter(r => r.id !== requestId);
+    this.saveDemoAccessRequests(current);
     this.accessRequests = current;
     this.notifyListeners();
     return true;

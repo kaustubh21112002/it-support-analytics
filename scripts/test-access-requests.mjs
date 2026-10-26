@@ -4,12 +4,15 @@
  * ============================================================================
  * Tests:
  * 1. Server-side input validation (name, email, role, reason).
- * 2. Durable storage persistence and cross-session retrieval.
- * 3. Prevention of duplicate submissions for pending requests.
- * 4. Zero-trust non-escalation: no account creation or privilege grant.
- * 5. Role restrictions: non-admins cannot review requests.
- * 6. Admin review execution: state transition to approved/rejected.
- * 7. Reviewer identity, timestamps, review reasons, and immutable audit logs.
+ * 2. Authoritative database storage contract (fails clearly when table is unprovisioned).
+ * 3. Elimination of misleading local fallbacks in production mode.
+ * 4. Explicit demo mode isolation (allows interactive testing without claiming database persistence).
+ * 5. Prevention of duplicate submissions for pending requests.
+ * 6. Zero-trust non-escalation: no account creation or privilege grant.
+ * 7. Role restrictions: non-admins cannot review requests.
+ * 8. Admin review execution: state transition to approved/rejected.
+ * 9. Reviewer identity, timestamps, review reasons, and immutable audit logs.
+ * 10. Protection against concurrent overwriting of already-decided requests.
  * ============================================================================
  */
 
@@ -67,6 +70,7 @@ async function runAccessRequestTests() {
 
   try {
     const { dataService } = await server.ssrLoadModule('/src/services/dataService.ts');
+    const { supabase, isSupabaseAvailable } = await server.ssrLoadModule('/src/lib/supabase.ts');
 
     // -------------------------------------------------------------------------
     // TEST 1: Strict Server-Side Validation
@@ -122,12 +126,13 @@ async function runAccessRequestTests() {
     });
 
     // -------------------------------------------------------------------------
-    // TEST 2: Durable Persistence & Cross-Session Retrieval
+    // TEST 2: Authoritative Database Storage Contract & Honest Error Handling
     // -------------------------------------------------------------------------
-    console.log('\nTest Suite 2: Durable Persistence & Cross-Session Retrieval...');
+    console.log('\nTest Suite 2: Production Storage Contract & Unprovisioned Schema Handling...');
 
-    let createdId = '';
-    await test('Successfully persists valid request to durable store and audit log', async () => {
+    await test('Fails honestly with migration requirement when Supabase table is unprovisioned', async () => {
+      // In this environment, public.access_requests is not yet applied on Supabase.
+      // Must return an explicit error and NOT falsely claim success.
       const res = await dataService.submitAccessRequest({
         fullName: 'Alice Walker',
         workEmail: 'alice.walker@example.com',
@@ -136,44 +141,58 @@ async function runAccessRequestTests() {
         reason: 'Joining Tier 1 support desk as an escalated rotational specialist'
       });
 
+      assert.equal(res.success, false, 'Must not claim success when database table is unprovisioned');
+      assert.equal(res.isAuthoritative, false);
+      assert.match(res.error, /public\.access_requests is not yet provisioned|migration required/i);
+    });
+
+    await test('getAccessRequestsAsync reports authoritative status and explicit configuration notice', async () => {
+      const res = await dataService.getAccessRequestsAsync();
+      assert.equal(res.isAuthoritative, false);
+      assert.ok(res.error, 'Should report unprovisioned table error');
+      assert.match(res.error, /public\.access_requests is not yet provisioned/i);
+    });
+
+    // -------------------------------------------------------------------------
+    // TEST 3: Explicit Demo Mode Sandbox Testing
+    // -------------------------------------------------------------------------
+    console.log('\nTest Suite 3: Explicit Demo Mode Sandbox...');
+
+    let demoId = '';
+    await test('Explicit demo submission records in demo mode without claiming authoritative database storage', async () => {
+      const res = await dataService.submitAccessRequest({
+        fullName: 'Alice Walker',
+        workEmail: 'alice.walker@example.com',
+        departmentId: 2,
+        requestedRole: 'agent',
+        reason: 'Joining Tier 1 support desk as an escalated rotational specialist'
+      }, { isDemoSubmission: true });
+
       assert.equal(res.success, true);
       assert.ok(res.request);
-      assert.equal(res.isPersisted, true);
+      assert.equal(res.isAuthoritative, false);
+      assert.equal(res.storageProvenance, 'demo_mode');
       assert.ok(res.request.id.startsWith('REQ-'));
       assert.equal(res.request.status, 'pending_review');
       assert.equal(res.request.requestedRole, 'agent');
-      createdId = res.request.id;
+      demoId = res.request.id;
 
-      // Verify audit trail logged
+      // Verify audit trail logged with demo mode label
       const audits = dataService.getAuditEvents();
       const auditEntry = audits.find(a => a.action === 'ACCESS_REQUEST_SUBMITTED' && a.user === 'alice.walker@example.com');
       assert.ok(auditEntry, 'Expected ACCESS_REQUEST_SUBMITTED audit event');
       assert.equal(auditEntry.user, 'alice.walker@example.com');
-      assert.match(auditEntry.details, /Alice Walker/);
+      assert.match(auditEntry.details, /\[DEMO MODE\]/);
     });
 
-    await test('Cross-session retrieval returns persisted record from storage', async () => {
-      const requests = await dataService.getAccessRequestsAsync();
-      const match = requests.find(r => r.id === createdId);
-      assert.ok(match, 'Request must be retrievable from persistent storage');
-      assert.equal(match.fullName, 'Alice Walker');
-      assert.equal(match.requestedRole, 'agent');
-      assert.equal(match.status, 'pending_review');
-    });
-
-    // -------------------------------------------------------------------------
-    // TEST 3: Duplicate Submission Prevention
-    // -------------------------------------------------------------------------
-    console.log('\nTest Suite 3: Duplicate Submission Prevention...');
-
-    await test('Prevents duplicate submission for identical email and role in pending state', async () => {
+    await test('Demo mode prevents duplicate submissions for identical email and role in pending state', async () => {
       const res = await dataService.submitAccessRequest({
         fullName: 'Alice Walker Duplicate',
         workEmail: 'alice.walker@example.com',
         departmentId: 2,
         requestedRole: 'agent',
         reason: 'Attempting to resubmit while previous request is pending'
-      });
+      }, { isDemoSubmission: true });
 
       assert.equal(res.success, false);
       assert.match(res.error, /already under review/i);
@@ -202,12 +221,13 @@ async function runAccessRequestTests() {
 
     await test('Non-admin role (agent) cannot review or approve access requests', async () => {
       const res = await dataService.reviewAccessRequest({
-        requestId: createdId,
+        requestId: demoId,
         action: 'approve',
         reviewerId: 'agent-123',
         reviewerName: 'Support Agent Jane',
         reviewerRole: 'agent',
-        reviewReason: 'Trying to approve myself'
+        reviewReason: 'Trying to approve myself',
+        isDemoSession: true
       });
 
       assert.equal(res.success, false);
@@ -216,12 +236,13 @@ async function runAccessRequestTests() {
 
     await test('Non-admin role (manager) cannot review or approve access requests', async () => {
       const res = await dataService.reviewAccessRequest({
-        requestId: createdId,
+        requestId: demoId,
         action: 'approve',
         reviewerId: 'mgr-456',
         reviewerName: 'Service Desk Manager Mark',
         reviewerRole: 'manager',
-        reviewReason: 'Manager approval attempt'
+        reviewReason: 'Manager approval attempt',
+        isDemoSession: true
       });
 
       assert.equal(res.success, false);
@@ -230,12 +251,13 @@ async function runAccessRequestTests() {
 
     await test('Platform Administrator can approve access request with recorded reviewer metadata', async () => {
       const res = await dataService.reviewAccessRequest({
-        requestId: createdId,
+        requestId: demoId,
         action: 'approve',
         reviewerId: 'admin-001',
         reviewerName: 'Admin System Lead',
         reviewerRole: 'admin',
-        reviewReason: 'Identity confirmed via HR directory. Assigned to Tier 1 rotational onboarding.'
+        reviewReason: 'Identity confirmed via HR directory. Assigned to Tier 1 rotational onboarding.',
+        isDemoSession: true
       });
 
       assert.equal(res.success, true);
@@ -247,23 +269,24 @@ async function runAccessRequestTests() {
 
       // Verify immutable audit event
       const audits = dataService.getAuditEvents();
-      const approvalAudit = audits.find(a => a.action === 'ACCESS_REQUEST_APPROVED' && a.details.includes(createdId));
+      const approvalAudit = audits.find(a => a.action === 'ACCESS_REQUEST_APPROVED' && a.details.includes(demoId));
       assert.ok(approvalAudit, 'Expected ACCESS_REQUEST_APPROVED audit event');
       assert.equal(approvalAudit.user, 'Admin System Lead');
     });
 
-    await test('Already reviewed request cannot be reviewed again', async () => {
+    await test('Already reviewed request cannot be reviewed again (prevents concurrent overwrite)', async () => {
       const res = await dataService.reviewAccessRequest({
-        requestId: createdId,
+        requestId: demoId,
         action: 'reject',
         reviewerId: 'admin-001',
         reviewerName: 'Admin System Lead',
         reviewerRole: 'admin',
-        reviewReason: 'Attempting secondary review'
+        reviewReason: 'Attempting secondary review',
+        isDemoSession: true
       });
 
       assert.equal(res.success, false);
-      assert.match(res.error, /already been reviewed/i);
+      assert.match(res.error, /already been decided/i);
     });
 
     await test('Administrator can review and reject a separate access request', async () => {
@@ -273,7 +296,7 @@ async function runAccessRequestTests() {
         departmentId: 1,
         requestedRole: 'admin',
         reason: 'I need administrative root credentials immediately'
-      });
+      }, { isDemoSubmission: true });
       assert.equal(submitRes.success, true);
 
       const rejectRes = await dataService.reviewAccessRequest({
@@ -282,7 +305,8 @@ async function runAccessRequestTests() {
         reviewerId: 'admin-001',
         reviewerName: 'Admin System Lead',
         reviewerRole: 'admin',
-        reviewReason: 'Third party contractors cannot hold platform administrator privileges.'
+        reviewReason: 'Third party contractors cannot hold platform administrator privileges.',
+        isDemoSession: true
       });
 
       assert.equal(rejectRes.success, true);

@@ -234,5 +234,5 @@ export interface AccessRequest {
   reviewedBy?: string;
   reviewedByName?: string;
   reviewReason?: string;
-  storageProvenance?: 'database' | 'persistent_storage';
+  storageProvenance?: 'database' | 'demo_mode';
 }
