@@ -1,0 +1,16 @@
+User-agent: *
+Allow: /$
+Allow: /request-access$
+Allow: /login$
+Disallow: /portal/
+Disallow: /analytics/
+Disallow: /agent/
+Disallow: /admin/
+Disallow: /verify
+Disallow: /reset-password
+Disallow: /forgot-password
+Disallow: /403
+Disallow: /404
+
+Sitemap: https://it-support-analytics.vercel.app/sitemap.xml
+
